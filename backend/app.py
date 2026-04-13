@@ -280,7 +280,7 @@ def _jwt_secret() -> str:
 def _issue_token(user_id: int) -> str:
     exp = datetime.utcnow() + timedelta(days=JWT_EXPIRES_DAYS)
     return jwt.encode(
-        {"sub": user_id, "exp": exp},
+        {"sub": str(user_id), "exp": exp},
         _jwt_secret(),
         algorithm=JWT_ALGO,
     )
@@ -290,7 +290,9 @@ def _decode_token(token: str) -> int | None:
     try:
         data = jwt.decode(token, _jwt_secret(), algorithms=[JWT_ALGO])
         uid = data.get("sub")
-        return int(uid) if uid is not None else None
+        if uid is None:
+            return None
+        return int(uid)
     except (jwt.PyJWTError, ValueError, TypeError):
         print(traceback.format_exc())
         return None

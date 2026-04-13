@@ -1,82 +1,304 @@
-import React, { useState, useMemo } from 'react';
-import { ChevronLeft, Users, Share2, AlertCircle, Smile, X, Check, Briefcase } from 'lucide-react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import {
+  ChevronLeft,
+  Users,
+  Share2,
+  Link2,
+  AlertCircle,
+  Smile,
+  X,
+  Check,
+  Briefcase,
+  UserCircle2,
+  UserMinus,
+} from 'lucide-react';
 import { CURRENT_USER, IconMap } from '../constants/data';
+import { api } from '../api';
 
 const AssigneeBtn = ({ user, active, onClick, theme }) => (
-  <button onClick={onClick} className="flex flex-col items-center space-y-2 group">
-    <div className={`w-14 h-14 rounded-full p-1 transition-all ${active ? theme.primary : 'bg-transparent'}`}>
-       <img src={user?.avatar} alt="avatar" className="w-full h-full rounded-full bg-white" />
+  <button
+    type="button"
+    onClick={onClick}
+    className="flex flex-col items-center space-y-2 group min-w-0"
+  >
+    <div
+      className={`w-14 h-14 rounded-full p-1 transition-all shrink-0 ${active ? theme.primary : 'bg-transparent'}`}
+    >
+      <img src={user?.avatar} alt="" className="w-full h-full rounded-full bg-white object-cover" />
     </div>
-    <span className={`text-xs font-bold ${active ? theme.primaryText : 'text-[#9A9A9A]'}`}>{user?.name}</span>
+    <span className={`text-xs font-bold truncate max-w-[4.5rem] ${active ? theme.primaryText : theme.textSub}`}>
+      {user?.name || '—'}
+    </span>
   </button>
 );
 
-const CheckItem = ({ item, checked, onToggle, type, collaborators, friends, onAssignClick, theme }) => {
+const CheckItem = ({
+  item,
+  checked,
+  onToggle,
+  type,
+  collaborators,
+  friends,
+  onAssignClick,
+  theme,
+  meUser,
+  canAssign,
+  readOnly,
+}) => {
   const isCritical = type === 'critical';
   const hasCollaborators = collaborators && collaborators.length > 0;
-  let assigneeAvatar = CURRENT_USER.avatar;
-  let assigneeName = 'Me';
+  let assigneeAvatar = meUser.avatar;
+  let assigneeName = meUser.name || 'Me';
 
   if (item.assignedTo && item.assignedTo !== 'me') {
-    const friend = friends ? friends.find(f => f.id === item.assignedTo) : null;
-    if (friend) { assigneeAvatar = friend.avatar; assigneeName = friend.name; }
+    const friend = friends?.find((f) => f.id === item.assignedTo);
+    if (friend) {
+      assigneeAvatar = friend.avatar;
+      assigneeName = friend.name;
+    }
   }
 
   const checkColor = isCritical ? 'bg-[#D98282] border-[#D98282]' : `${theme.success} border-[#CCD5AE]`;
-  const borderColor = isCritical ? 'border-[#FADCDC] bg-[#FFF5F5]' : 'border-[#EAEAEA] bg-white';
+  const rowBg = checked
+    ? theme.isDark
+      ? 'bg-slate-800/40'
+      : 'bg-[#FAF9F6]'
+    : theme.isDark
+      ? 'bg-slate-900/30 hover:bg-slate-800/40'
+      : 'bg-white hover:bg-[#FFFCF8]';
+  const borderRow = theme.isDark ? 'border-slate-700/50' : 'border-[#F9F9F9]';
+  const borderUnchecked = isCritical
+    ? theme.isDark
+      ? 'border-rose-900/50 bg-rose-950/20'
+      : 'border-[#FADCDC] bg-[#FFF5F5]'
+    : theme.isDark
+      ? 'border-slate-600 bg-slate-900/50'
+      : 'border-[#EAEAEA] bg-white';
 
   return (
-    <div onClick={onToggle} className={`relative flex items-center p-5 border-b last:border-0 border-[#F9F9F9] cursor-pointer transition-colors duration-200 ${checked ? 'bg-[#FAF9F6]' : 'bg-white hover:bg-[#FFFCF8]'}`}>
-      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-all duration-300 shadow-sm ${checked ? checkColor : borderColor}`}>
-        <Check size={14} className={`text-white transition-transform duration-300 ${checked ? 'scale-100' : 'scale-0'}`} />
-      </div>
-      <div className="flex-1 pr-10">
-        <span className={`font-medium text-base transition-all duration-300 block ${checked ? 'text-[#D1D1D1] line-through decoration-[#EAEAEA]' : theme.textMain}`}>{item.text}</span>
-        <div className="flex items-center mt-1.5 space-x-2">
-          {isCritical && !checked && <span className={`text-[10px] font-bold ${theme.danger} px-2 py-0.5 rounded-md`}>Must</span>}
-          {item.assignedTo && hasCollaborators && <span className="text-[10px] text-[#B0B0B0] flex items-center bg-[#F5F5F5] px-2 py-0.5 rounded-md">by {assigneeName}</span>}
+    <div
+      className={`relative flex items-center gap-3 p-4 border-b last:border-b-0 ${borderRow} ${rowBg} transition-colors duration-200`}
+    >
+      <button
+        type="button"
+        disabled={readOnly}
+        onClick={() => !readOnly && onToggle()}
+        className={`flex flex-1 items-center min-w-0 text-left gap-3 rounded-xl -m-1 p-1 pr-2 transition-transform ${
+          readOnly ? 'cursor-default opacity-90' : 'active:scale-[0.99]'
+        }`}
+      >
+        <div
+          className={`w-7 h-7 shrink-0 rounded-full border-2 flex items-center justify-center transition-all shadow-sm ${
+            checked ? checkColor : borderUnchecked
+          }`}
+        >
+          <Check size={14} className={`text-white transition-transform ${checked ? 'scale-100' : 'scale-0'}`} />
         </div>
-      </div>
-      {hasCollaborators && (
-        <div onClick={(e) => { e.stopPropagation(); onAssignClick(); }} className="absolute right-4 top-1/2 transform -translate-y-1/2 active:scale-90 transition-transform cursor-pointer">
-           <img src={assigneeAvatar} alt="avatar" className={`w-9 h-9 rounded-full border-2 border-white shadow-sm`} />
+        <div className="flex-1 min-w-0 pr-2">
+          <span
+            className={`font-medium text-[15px] leading-snug block transition-all ${
+              checked ? `${theme.textSub} line-through decoration-2` : theme.textMain
+            }`}
+          >
+            {item.text}
+          </span>
+          <div className="flex items-center mt-1.5 flex-wrap gap-1.5">
+            {isCritical && !checked && (
+              <span className={`text-[10px] font-bold ${theme.danger} px-2 py-0.5 rounded-md`}>Must bring</span>
+            )}
+            {item.assignedTo && hasCollaborators && (
+              <span
+                className={`text-[10px] font-medium flex items-center px-2 py-0.5 rounded-md ${
+                  theme.isDark ? 'bg-slate-800 text-slate-400' : 'bg-[#F5F5F5] text-[#888888]'
+                }`}
+              >
+                {assigneeName}
+              </span>
+            )}
+          </div>
         </div>
-      )}
+      </button>
+      {canAssign && !readOnly ? (
+        <button
+          type="button"
+          aria-label="Assign item"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAssignClick();
+          }}
+          className={`shrink-0 w-11 h-11 rounded-2xl flex items-center justify-center transition-all active:scale-95 ${
+            theme.isDark ? 'bg-slate-800 hover:bg-slate-700' : 'bg-[#F7F7F7] hover:bg-[#EFEFEF]'
+          }`}
+        >
+          <img
+            src={assigneeAvatar}
+            alt=""
+            className={`w-9 h-9 rounded-full object-cover border-2 ${
+              theme.isDark ? 'border-slate-600' : 'border-white shadow-sm'
+            }`}
+          />
+        </button>
+      ) : null}
     </div>
   );
 };
 
-const ChecklistDetail = ({ scenario, friends, updateScenario, checkedItems, setCheckedItems, onBack, onFinish, weather, theme }) => {
+const ChecklistDetail = ({
+  scenario,
+  friends,
+  updateScenario,
+  checkedItems,
+  setCheckedItems,
+  onBack,
+  onFinish,
+  weather,
+  theme,
+  meUser,
+  onShareScenario,
+  onUnshareScenario,
+  t,
+}) => {
+  const ensureUniqueItemIds = useCallback((items) => {
+    const seen = new Set();
+    let changed = false;
+    const next = (Array.isArray(items) ? items : []).map((it, idx) => {
+      const raw = it?.id == null ? '' : String(it.id).trim();
+      let id = raw;
+      if (!id || seen.has(id)) {
+        id = `it_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 8)}`;
+        changed = true;
+      }
+      seen.add(id);
+      if (id !== raw) return { ...(it || {}), id };
+      return it;
+    });
+    return { items: next, changed };
+  }, []);
+
+  const me = meUser || CURRENT_USER;
+  const readOnly = scenario.access === 'shared';
+  const isOwner = scenario.access === 'owner';
   const [isClosing, setIsClosing] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const [assigningItem, setAssigningItem] = useState(null);
+  const [shareUsername, setShareUsername] = useState('');
+  const [shareBusy, setShareBusy] = useState(false);
+  const [shareError, setShareError] = useState('');
+  const [lookupPreview, setLookupPreview] = useState(null);
+  const [lookupBusy, setLookupBusy] = useState(false);
 
-  const finalItems = useMemo(() => [...scenario.items], [scenario, weather]);
+  const itemChecksKey = useMemo(
+    () =>
+      (scenario.items || [])
+        .map((i) => `${i.id}:${i.checked ? 1 : 0}`)
+        .join('|'),
+    [scenario.items],
+  );
+
+  useEffect(() => {
+    const normalized = ensureUniqueItemIds(scenario.items || []);
+    if (normalized.changed) {
+      void updateScenario({ ...scenario, items: normalized.items });
+    }
+  }, [ensureUniqueItemIds, scenario, updateScenario]);
+
+  useEffect(
+    () => {
+      const next = {};
+      (scenario.items || []).forEach((it) => {
+        if (it && it.id != null && it.checked) next[it.id] = true;
+      });
+      setCheckedItems(next);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- itemChecksKey encodes items[].checked
+    [scenario.id, itemChecksKey, setCheckedItems],
+  );
+
+  useEffect(() => {
+    if (!showShareModal) {
+      setLookupPreview(null);
+      return undefined;
+    }
+    const u = shareUsername.trim().toLowerCase();
+    if (u.length < 3) {
+      setLookupPreview(null);
+      return undefined;
+    }
+    const t = setTimeout(() => {
+      void (async () => {
+        setLookupBusy(true);
+        try {
+          const res = await api.lookupUser(u);
+          if (res?.found && res.user) setLookupPreview({ ok: true, user: res.user });
+          else if (res && res.found === false && !res.error) setLookupPreview({ ok: false });
+          else setLookupPreview(null);
+        } catch {
+          setLookupPreview(null);
+        } finally {
+          setLookupBusy(false);
+        }
+      })();
+    }, 400);
+    return () => clearTimeout(t);
+  }, [shareUsername, showShareModal]);
+
+  const finalItems = useMemo(() => ensureUniqueItemIds(scenario.items || []).items, [ensureUniqueItemIds, scenario.items]);
   const totalCount = finalItems.length;
-  const checkedCount = Object.keys(checkedItems).filter(k => checkedItems[k]).length;
+  const checkedCount = Object.keys(checkedItems).filter((k) => checkedItems[k]).length;
   const progress = totalCount > 0 ? (checkedCount / totalCount) * 100 : 0;
 
-  const criticalItems = finalItems.filter(i => i.critical);
-  const criticalUnchecked = criticalItems.some(i => !checkedItems[i.id]);
+  const criticalItems = finalItems.filter((i) => i.critical);
+  const criticalUnchecked = criticalItems.some((i) => !checkedItems[i.id]);
   const isReady = !criticalUnchecked && checkedCount > 0;
 
-  const toggleItem = (id) => setCheckedItems(prev => ({ ...prev, [id]: !prev[id] }));
+  const canAssign =
+    !readOnly && ((friends?.length || 0) > 0 || (scenario.collaborators?.length || 0) > 0);
+
+  const toggleItem = (id) => {
+    if (readOnly) return;
+    const nextChecked = !checkedItems[id];
+    const newCheckedMap = { ...checkedItems, [id]: nextChecked };
+    setCheckedItems(newCheckedMap);
+    const newItems = (scenario.items || []).map((it) => ({
+      ...it,
+      checked: !!newCheckedMap[it.id],
+    }));
+    void updateScenario({ ...scenario, items: newItems });
+  };
 
   const handleFinish = () => {
-    if (!isReady) return;
+    if (readOnly || !isReady) return;
     setIsClosing(true);
     setTimeout(() => onFinish(), 800);
   };
 
   const handleAddFriend = (friendId) => {
+    if (readOnly) return;
     if (scenario.collaborators?.includes(friendId)) return;
-    updateScenario({ ...scenario, collaborators: [...(scenario.collaborators || []), friendId] });
-    setShowInviteModal(false);
+    updateScenario({
+      ...scenario,
+      collaborators: [...(scenario.collaborators || []), friendId],
+    });
   };
 
+  const handleRemoveCollaborator = useCallback(
+    (friendId) => {
+      if (readOnly) return;
+      const collab = (scenario.collaborators || []).filter((id) => id !== friendId);
+      const newItems = (scenario.items || []).map((item) =>
+        item.assignedTo === friendId ? { ...item, assignedTo: 'me' } : item,
+      );
+      updateScenario({ ...scenario, collaborators: collab, items: newItems });
+    },
+    [scenario, updateScenario, readOnly],
+  );
+
   const handleAssignItem = (userId) => {
-    if (!assigningItem) return;
-    const newItems = scenario.items.map(item => item.id === assigningItem.id ? { ...item, assignedTo: userId } : item);
+    if (readOnly || !assigningItem) return;
+    const newItems = scenario.items.map((item) =>
+      item.id === assigningItem.id ? { ...item, assignedTo: userId } : item,
+    );
     updateScenario({ ...scenario, items: newItems });
     setAssigningItem(null);
   };
@@ -84,91 +306,508 @@ const ChecklistDetail = ({ scenario, friends, updateScenario, checkedItems, setC
   const Icon = IconMap[scenario.icon] || Briefcase;
   const cardTheme = scenario.theme || { bg: theme.primary, text: 'text-white' };
 
+  const listShell = `${theme.cardBg} rounded-[22px] overflow-hidden border shadow-sm ${
+    theme.isDark ? 'border-slate-700/50 shadow-black/20' : 'border-black/[0.04] shadow-[0_2px_15px_rgba(0,0,0,0.02)]'
+  }`;
+
+  const ringTrack = theme.isDark ? '#334155' : '#EAEAEA';
+
+  const footerFade = theme.isDark
+    ? 'from-[#161311] via-[#161311]/92 to-transparent'
+    : 'from-[#FFFBF5] via-[#FFFBF5]/92 to-transparent';
+
   return (
-    <div className={`min-h-screen ${theme.bg} flex flex-col relative transition-opacity duration-500 ${isClosing ? 'opacity-0' : 'opacity-100'}`}>
-      <div className={`sticky top-0 z-20 ${theme.bg}/90 backdrop-blur-md px-4 h-16 flex items-center justify-between border-b border-[#F0F0F0]`}>
-        <button onClick={onBack} className={`w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-sm ${theme.textMain}`}><ChevronLeft size={24} /></button>
-        <div className="flex flex-col items-center">
-          <span className={`font-bold ${theme.textMain}`}>{scenario.name}</span>
-          {(scenario.collaborators?.length > 0) && <span className={`text-[10px] ${theme.primaryText} bg-[#FAE8E0] px-2 py-0.5 rounded-full flex items-center mt-0.5`}><Users size={10} className="mr-1"/> Collab Mode</span>}
-        </div>
-        <button onClick={() => setShowInviteModal(true)} className="relative w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-sm">
-          {scenario.collaborators?.length > 0 ? (
-            <div className="flex -space-x-2"><img src={CURRENT_USER.avatar} alt="me" className="w-8 h-8 rounded-full border-2 border-white" /><div className={`w-8 h-8 rounded-full border-2 border-white ${theme.accentBlue} flex items-center justify-center text-xs font-bold`}>+{scenario.collaborators.length}</div></div>
-          ) : <Share2 size={20} className="text-[#9A9A9A]" />}
+    <div
+      className={`min-h-screen ${theme.bg} flex flex-col relative transition-opacity duration-500 ${
+        isClosing ? 'opacity-0' : 'opacity-100'
+      }`}
+    >
+      <div
+        className={`sticky top-0 z-20 ${theme.bg}/95 backdrop-blur-md px-4 h-[52px] flex items-center justify-between border-b ${
+          theme.isDark ? 'border-slate-800/80' : 'border-[#F0F0F0]'
+        }`}
+      >
+        <button
+          type="button"
+          onClick={onBack}
+          className={`w-10 h-10 flex items-center justify-center rounded-full shadow-sm ${
+            theme.isDark ? 'bg-slate-800 text-slate-100' : `bg-white ${theme.textMain}`
+          }`}
+        >
+          <ChevronLeft size={22} />
         </button>
-      </div>
-
-      <div className="pt-8 pb-10 px-6 flex flex-col items-center justify-center overflow-hidden relative">
-         <div className="relative w-32 h-32 mb-6">
-             <svg className="w-full h-full transform -rotate-90">
-                <circle cx="64" cy="64" r="58" stroke="#EAEAEA" strokeWidth="8" fill="none" strokeLinecap="round" />
-                <circle cx="64" cy="64" r="58" className={`stroke-current ${theme.primaryText.replace('text-', '')}`} strokeWidth="8" fill="none" strokeDasharray="364" strokeDashoffset={364 - (364 * progress) / 100} style={{ transition: 'stroke-dashoffset 1s ease-out' }} strokeLinecap="round"/>
-             </svg>
-             <div className={`absolute inset-0 m-2 rounded-full ${theme.cardBg} shadow-inner flex items-center justify-center`}><div className={`p-4 rounded-2xl ${cardTheme.bg} ${cardTheme.text} bg-opacity-30`}><Icon size={40} strokeWidth={1.5} /></div></div>
-         </div>
-         <p className={`text-[#9A9A9A] font-medium text-sm bg-white px-4 py-1 rounded-full shadow-sm`}>Packed {checkedCount} / {totalCount}</p>
-      </div>
-
-      <div className="flex-1 px-4 py-2 space-y-6 pb-36">
-        {criticalItems.length > 0 && (
-          <div className="space-y-3">
-             <h3 className={`text-xs font-bold ${theme.danger} bg-opacity-0 uppercase tracking-wider flex items-center ml-2`}><AlertCircle size={14} className="mr-1" /> Critical Items</h3>
-             <div className="bg-white rounded-3xl overflow-hidden shadow-[0_2px_15px_rgba(0,0,0,0.02)]">
-                {criticalItems.map(item => <CheckItem key={item.id} item={item} checked={!!checkedItems[item.id]} onToggle={() => toggleItem(item.id)} type="critical" friends={friends} collaborators={scenario.collaborators} onAssignClick={() => setAssigningItem(item)} theme={theme}/>)}
-             </div>
-          </div>
-        )}
-        <div className="space-y-3">
-           <h3 className={`text-xs font-bold text-[#A0A0A0] uppercase tracking-wider ml-2`}>Normal Items</h3>
-           <div className="bg-white rounded-3xl overflow-hidden shadow-[0_2px_15px_rgba(0,0,0,0.02)]">
-              {finalItems.filter(i => !i.critical).map(item => <CheckItem key={item.id} item={item} checked={!!checkedItems[item.id]} onToggle={() => toggleItem(item.id)} type="normal" friends={friends} collaborators={scenario.collaborators} onAssignClick={() => setAssigningItem(item)} theme={theme}/>)}
-           </div>
+        <div className="flex flex-col items-center max-w-[58%]">
+          <span className={`font-bold ${theme.textMain} text-center text-[15px] leading-tight truncate w-full`}>
+            {scenario.name}
+          </span>
+          {weather && weather.source === 'open-meteo' && weather.temp != null && weather.location ? (
+            <span className={`text-[10px] ${theme.textSub} font-medium mt-0.5 text-center leading-tight px-1 line-clamp-2`}>
+              {weather.locationDetail ? `${weather.locationDetail} · ` : ''}
+              {weather.location} · {weather.temp}°{weather.tempUnit || 'C'} · {weather.condition || ''}
+            </span>
+          ) : null}
+          {(((scenario.collaborators?.length || 0) > 0 ||
+            (scenario.share_recipients?.length || 0) > 0) &&
+            !readOnly) ? (
+            <span
+              className={`text-[10px] mt-0.5 px-2 py-0.5 rounded-full flex items-center gap-0.5 font-bold ${
+                theme.isDark ? 'bg-amber-950/50 text-amber-200' : `${theme.primaryLight} ${theme.primaryText}`
+              }`}
+            >
+              <Users size={10} /> {scenario.access === 'shared_edit' ? 'Collaborating' : 'Shared'}
+            </span>
+          ) : null}
         </div>
-      </div>
-
-      <div className={`fixed bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-[${theme.bg.replace('bg-[','').replace(']','')}] via-[${theme.bg.replace('bg-[','').replace(']','')}] to-transparent z-10 max-w-md mx-auto`}>
-         <button onClick={handleFinish} disabled={!isReady} className={`w-full h-16 rounded-[24px] font-bold text-lg shadow-xl flex items-center justify-center space-x-2 transition-all duration-500 transform active:scale-95 ${isReady ? `${theme.primary} text-white shadow-[#E6B89C]/40 translate-y-0` : 'bg-[#EAEAEA] text-[#C0C0C0] cursor-not-allowed shadow-none translate-y-0'}`}>
-           <span>{isReady ? "All packed, let's go!" : 'Still missing items'}</span>
-           {isReady && <Smile size={24} />}
-         </button>
-      </div>
-
-      {showInviteModal && (
-        <div className={`absolute inset-0 z-50 ${theme.textMain}/20 backdrop-blur-sm flex items-center justify-center p-6`}>
-          <div className="bg-white w-full rounded-3xl p-6 animate-fade-in shadow-2xl">
-            <h3 className={`text-xl font-bold ${theme.textMain} mb-2`}>Invite Friends</h3>
-            <p className={`text-sm ${theme.textSub} mb-6`}>Pack together, travel happier.</p>
-            <div className="space-y-3">
-              {friends.map(friend => {
-                const isAdded = scenario.collaborators?.includes(friend.id);
-                return (
-                  <div key={friend.id} className="flex items-center justify-between p-3 bg-[#FAFAFA] rounded-2xl">
-                    <div className="flex items-center space-x-3"><img src={friend.avatar} alt="friend" className="w-10 h-10 rounded-full bg-white shadow-sm" /><span className={`font-bold ${theme.textMain}`}>{friend.name}</span></div>
-                    <button onClick={() => handleAddFriend(friend.id)} disabled={isAdded} className={`px-4 py-2 rounded-xl font-bold text-xs ${isAdded ? 'text-[#C0C0C0]' : `${theme.accentGreen} text-[#7A9E83]`}`}>{isAdded ? 'Invited' : 'Invite'}</button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isOwner ? (
+            <>
+              {onShareScenario ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowShareModal(true);
+                    setShareError('');
+                    setShareUsername('');
+                  }}
+                  className={`w-10 h-10 flex items-center justify-center rounded-full shadow-sm ${
+                    theme.isDark ? 'bg-slate-800 text-sky-300' : 'bg-white text-sky-600'
+                  }`}
+                  aria-label="Share with account"
+                  title="Share with friend account"
+                >
+                  <Link2 size={18} />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setShowInviteModal(true)}
+                className={`relative w-10 h-10 flex items-center justify-center rounded-full shadow-sm ${
+                  theme.isDark ? 'bg-slate-800' : 'bg-white'
+                }`}
+                aria-label="Invite on this list"
+                title="Invite for assigning items"
+              >
+                {(scenario.collaborators?.length || 0) > 0 ? (
+                  <div className="flex -space-x-2">
+                    <img src={me.avatar} alt="" className="w-8 h-8 rounded-full border-2 border-white object-cover" />
+                    <div
+                      className={`w-8 h-8 rounded-full border-2 border-white ${theme.accentBlue} flex items-center justify-center text-[10px] font-bold`}
+                    >
+                      +{scenario.collaborators.length}
+                    </div>
                   </div>
-                )
-              })}
+                ) : (
+                  <Share2 size={20} className={theme.textSub} />
+                )}
+              </button>
+            </>
+          ) : (
+            <div className="w-10 h-10 shrink-0" aria-hidden />
+          )}
+        </div>
+      </div>
+
+      {readOnly ? (
+        <div
+          className={`mx-4 mt-3 px-3 py-2.5 rounded-2xl text-xs font-semibold text-center ${
+            theme.isDark ? 'bg-sky-950/40 text-sky-200 border border-sky-800/50' : 'bg-sky-50 text-sky-900 border border-sky-100'
+          }`}
+        >
+          View only · shared by @{scenario.owner_username || 'friend'}
+        </div>
+      ) : null}
+
+      {isOwner && !readOnly && (scenario.share_recipients?.length || 0) > 0 && onUnshareScenario ? (
+        <div
+          className={`mx-4 mt-3 px-3 py-3 rounded-2xl text-xs ${
+            theme.isDark ? 'bg-violet-950/35 text-violet-100 border border-violet-800/50' : 'bg-violet-50 text-violet-950 border border-violet-100'
+          }`}
+        >
+          <p className="font-bold mb-2">Shared for view-only (account)</p>
+          <ul className="space-y-2">
+            {scenario.share_recipients.map((r) => (
+              <li key={r.username} className="flex items-center justify-between gap-2">
+                <span className="font-semibold truncate">@{r.username}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void (async () => {
+                      try {
+                        await onUnshareScenario(scenario.id, r.username);
+                      } catch (err) {
+                        window.alert(err?.message || 'Could not revoke share.');
+                      }
+                    })();
+                  }}
+                  className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-lg ${
+                    theme.isDark ? 'bg-rose-950/60 text-rose-200' : 'bg-white text-rose-700 border border-rose-100'
+                  }`}
+                >
+                  Revoke
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <div className="pt-6 pb-8 px-5 flex flex-col items-center">
+        <div className="relative w-[7.5rem] h-[7.5rem] mb-4">
+          <svg className="w-full h-full transform -rotate-90" viewBox="0 0 128 128">
+            <circle
+              cx="64"
+              cy="64"
+              r="56"
+              stroke={ringTrack}
+              strokeWidth="10"
+              fill="none"
+              strokeLinecap="round"
+            />
+            <circle
+              cx="64"
+              cy="64"
+              r="56"
+              stroke="currentColor"
+              className={theme.isDark ? 'text-slate-300' : theme.primaryText}
+              strokeWidth="10"
+              fill="none"
+              strokeDasharray={`${2 * Math.PI * 56}`}
+              strokeDashoffset={`${2 * Math.PI * 56 * (1 - progress / 100)}`}
+              style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}
+              strokeLinecap="round"
+            />
+          </svg>
+          <div
+            className={`absolute inset-0 m-2.5 rounded-full ${theme.cardBg} shadow-inner flex items-center justify-center`}
+          >
+            <div className={`p-3.5 rounded-2xl ${cardTheme.bg} ${cardTheme.text} bg-opacity-30`}>
+              <Icon size={36} strokeWidth={1.5} />
             </div>
-            <button onClick={() => setShowInviteModal(false)} className="w-full mt-6 py-3 text-[#9A9A9A] font-bold bg-[#F5F5F5] rounded-xl">Close</button>
           </div>
+        </div>
+        <p
+          className={`text-sm font-semibold px-4 py-1.5 rounded-full ${
+            theme.isDark ? 'bg-slate-800 text-slate-300' : 'text-[#9A9A9A] bg-white shadow-sm'
+          }`}
+        >
+          Packed {checkedCount} / {totalCount}
+        </p>
+        {canAssign ? (
+          <p className={`text-[11px] ${theme.textSub} mt-2 text-center max-w-[240px]`}>
+            Tap the avatar on the right of a row to choose who packs that item.
+          </p>
+        ) : null}
+      </div>
+
+      <div className="flex-1 px-4 space-y-5 pb-40">
+        {criticalItems.length > 0 ? (
+          <div className="space-y-2">
+            <h3
+              className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 ml-1 ${theme.danger}`}
+            >
+              <AlertCircle size={13} className="shrink-0" /> Critical
+            </h3>
+            <div className={listShell}>
+              {criticalItems.map((item) => (
+                <CheckItem
+                  key={item.id}
+                  item={item}
+                  checked={!!checkedItems[item.id]}
+                  onToggle={() => toggleItem(item.id)}
+                  type="critical"
+                  friends={friends}
+                  collaborators={scenario.collaborators}
+                  onAssignClick={() => setAssigningItem(item)}
+                  theme={theme}
+                  meUser={me}
+                  canAssign={canAssign}
+                  readOnly={readOnly}
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
+        <div className="space-y-2">
+          <h3 className={`text-[11px] font-bold uppercase tracking-wider ml-1 ${theme.textSub}`}>Everything else</h3>
+          <div className={listShell}>
+            {finalItems
+              .filter((i) => !i.critical)
+              .map((item) => (
+                <CheckItem
+                  key={item.id}
+                  item={item}
+                  checked={!!checkedItems[item.id]}
+                  onToggle={() => toggleItem(item.id)}
+                  type="normal"
+                  friends={friends}
+                  collaborators={scenario.collaborators}
+                  onAssignClick={() => setAssigningItem(item)}
+                  theme={theme}
+                  meUser={me}
+                  canAssign={canAssign}
+                  readOnly={readOnly}
+                />
+              ))}
+          </div>
+        </div>
+      </div>
+
+      {!readOnly ? (
+        <>
+          <div
+            className={`pointer-events-none fixed bottom-0 left-0 right-0 h-36 max-w-md mx-auto bg-gradient-to-t ${footerFade} z-[5]`}
+          />
+          <div className="fixed bottom-0 left-0 right-0 p-6 pb-8 z-10 max-w-md mx-auto">
+            <button
+              type="button"
+              onClick={handleFinish}
+              disabled={!isReady}
+              className={`w-full h-[3.25rem] rounded-[22px] font-bold text-base shadow-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
+                isReady
+                  ? `${theme.primary} text-white shadow-black/10`
+                  : theme.isDark
+                    ? 'bg-slate-800 text-slate-500 cursor-not-allowed shadow-none'
+                    : 'bg-[#EAEAEA] text-[#C0C0C0] cursor-not-allowed shadow-none'
+              }`}
+            >
+              <span>{isReady ? "All packed — let's go!" : 'Finish critical items first'}</span>
+              {isReady ? <Smile size={22} /> : null}
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className={`px-6 pb-10 pt-2 text-center text-sm ${theme.textSub}`}>
+          Only the owner can check off items. This copy is for reference.
         </div>
       )}
 
-      {assigningItem && (
-        <div className={`absolute inset-0 z-50 ${theme.textMain}/20 backdrop-blur-sm flex items-end justify-center`}>
-           <div className="bg-white w-full rounded-t-[32px] p-8 animate-float-up shadow-2xl">
-              <div className="flex justify-between items-center mb-8">
-                 <div><h3 className={`text-lg font-bold ${theme.textMain}`}>Who is packing this?</h3><p className={`text-sm ${theme.textSub} mt-1`}>{assigningItem.text}</p></div>
-                 <button onClick={() => setAssigningItem(null)} className="p-2 bg-[#F5F5F5] rounded-full text-[#9A9A9A]"><X size={20}/></button>
+      {showShareModal && onShareScenario ? (
+        <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/45 p-6">
+          <div
+            className={`${theme.cardBg} w-full max-w-sm rounded-3xl p-6 shadow-2xl border ${
+              theme.isDark ? 'border-slate-600' : 'border-gray-100'
+            }`}
+          >
+            <h3 className={`text-lg font-bold ${theme.textMain} mb-1`}>Share on server</h3>
+            <p className={`text-xs ${theme.textSub} mb-4`}>
+              Enter your friend&apos;s Checkmate login name. They must accept your friend request first.
+            </p>
+            <label className={`text-xs font-bold ${theme.textSub}`}>Username</label>
+            <input
+              value={shareUsername}
+              onChange={(e) => setShareUsername(e.target.value.toLowerCase())}
+              placeholder="e.g. alex_travels"
+              className={`mt-1 w-full px-3 py-2.5 rounded-xl border text-sm mb-2 outline-none ${
+                theme.isDark ? 'bg-slate-900 border-slate-600 text-slate-100' : 'border-gray-200'
+              }`}
+            />
+            {lookupBusy ? (
+              <p className={`text-[11px] mb-2 ${theme.textSub}`}>Checking username…</p>
+            ) : null}
+            {!lookupBusy && lookupPreview?.ok && lookupPreview.user ? (
+              <div
+                className={`flex items-center gap-2 mb-3 p-2 rounded-xl ${
+                  theme.isDark ? 'bg-slate-800/80' : 'bg-emerald-50/90 border border-emerald-100'
+                }`}
+              >
+                <img src={lookupPreview.user.avatar} alt="" className="w-8 h-8 rounded-full bg-white" />
+                <div className="min-w-0">
+                  <p className={`text-xs font-bold truncate ${theme.textMain}`}>
+                    @{lookupPreview.user.username}
+                  </p>
+                  {lookupPreview.user.display_name ? (
+                    <p className={`text-[10px] truncate ${theme.textSub}`}>{lookupPreview.user.display_name}</p>
+                  ) : null}
+                </div>
               </div>
-              <div className="grid grid-cols-4 gap-4 mb-4">
-                 <AssigneeBtn user={CURRENT_USER} active={assigningItem.assignedTo === 'me'} onClick={() => handleAssignItem('me')} theme={theme} />
-                 {scenario.collaborators?.map(fid => <AssigneeBtn key={fid} user={friends.find(f => f.id === fid)} active={assigningItem.assignedTo === fid} onClick={() => handleAssignItem(fid)} theme={theme} />)}
+            ) : null}
+            {!lookupBusy && lookupPreview && lookupPreview.ok === false ? (
+              <p className="text-[11px] text-amber-700 dark:text-amber-300 mb-2">No account with that username.</p>
+            ) : null}
+            {friends.some((f) => f.is_registered) ? (
+              <div className="mb-3">
+                <p className={`text-[10px] font-bold ${theme.textSub} uppercase mb-1`}>Your friends</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {friends
+                    .filter((f) => f.is_registered)
+                    .map((f) => (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setShareUsername((f.username || f.name || '').toLowerCase())}
+                        className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${
+                          theme.isDark ? 'bg-slate-800 text-slate-200' : 'bg-[#F0F0F0] text-[#555]'
+                        }`}
+                      >
+                        @{f.username || f.name}
+                      </button>
+                    ))}
+                </div>
               </div>
-           </div>
+            ) : null}
+            {shareError ? <p className="text-xs text-red-500 mb-2">{shareError}</p> : null}
+            <div className="flex gap-2 mt-2">
+              <button
+                type="button"
+                onClick={() => setShowShareModal(false)}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold ${
+                  theme.isDark ? 'bg-slate-800 text-slate-200' : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={shareBusy}
+                onClick={() => {
+                  void (async () => {
+                    const u = shareUsername.trim().toLowerCase();
+                    if (!u) {
+                      setShareError('Enter a username.');
+                      return;
+                    }
+                    setShareBusy(true);
+                    setShareError('');
+                    try {
+                      await onShareScenario(scenario.id, u);
+                      setShowShareModal(false);
+                    } catch (err) {
+                      setShareError(err?.message || 'Could not share.');
+                    } finally {
+                      setShareBusy(false);
+                    }
+                  })();
+                }}
+                className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white ${theme.primary} disabled:opacity-50`}
+              >
+                Share
+              </button>
+            </div>
+          </div>
         </div>
-      )}
+      ) : null}
+
+      {showInviteModal ? (
+        <div className="absolute inset-0 z-50 flex items-end sm:items-center justify-center bg-black/45 p-0 sm:p-6">
+          <div
+            className={`${theme.cardBg} w-full sm:max-w-md rounded-t-[28px] sm:rounded-3xl p-6 shadow-2xl border-t sm:border max-h-[85vh] overflow-y-auto ${
+              theme.isDark ? 'border-slate-600' : 'border-gray-100'
+            }`}
+          >
+            <h3 className={`text-xl font-bold ${theme.textMain} mb-1`}>People on this list</h3>
+            <p className={`text-sm ${theme.textSub} mb-5`}>
+              Invite friends from your list, then assign items to them.
+            </p>
+            <div className="space-y-2">
+              {friends.length === 0 ? (
+                <p className={`text-sm ${theme.textSub} py-4 text-center`}>
+                  Add friends under the Me tab first, then come back here.
+                </p>
+              ) : (
+                friends.map((friend) => {
+                  const isAdded = scenario.collaborators?.includes(friend.id);
+                  return (
+                    <div
+                      key={friend.id}
+                      className={`flex items-center justify-between gap-3 p-3 rounded-2xl ${
+                        theme.isDark ? 'bg-slate-800/80' : 'bg-[#FAFAFA]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img src={friend.avatar} alt="" className="w-10 h-10 rounded-full bg-white shrink-0" />
+                        <span className={`font-bold ${theme.textMain} truncate`}>{friend.name}</span>
+                      </div>
+                      {isAdded ? (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCollaborator(friend.id)}
+                          className={`shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold ${
+                            theme.isDark
+                              ? 'bg-rose-950/50 text-rose-200'
+                              : 'bg-[#FADCDC] text-[#B85C5C]'
+                          }`}
+                        >
+                          <UserMinus size={14} /> Remove
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleAddFriend(friend.id)}
+                          className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold ${theme.accentGreen} text-[#7A9E83]`}
+                        >
+                          Add
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowInviteModal(false)}
+              className={`w-full mt-5 py-3.5 font-bold text-sm rounded-2xl ${
+                theme.isDark ? 'bg-slate-800 text-slate-300' : 'bg-[#F5F5F5] text-[#9A9A9A]'
+              }`}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {assigningItem ? (
+        <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/45">
+          <div
+            className={`${theme.cardBg} w-full rounded-t-[32px] p-6 pb-10 shadow-2xl border-t ${
+              theme.isDark ? 'border-slate-600' : 'border-gray-100'
+            } max-h-[80vh] overflow-y-auto`}
+          >
+            <div className="flex justify-between items-start gap-3 mb-6">
+              <div className="min-w-0">
+                <h3 className={`text-lg font-bold ${theme.textMain}`}>Who packs this?</h3>
+                <p className={`text-sm ${theme.textSub} mt-1 line-clamp-3`}>{assigningItem.text}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAssigningItem(null)}
+                className={`p-2 rounded-full shrink-0 ${theme.isDark ? 'bg-slate-800 text-slate-300' : 'bg-[#F5F5F5] text-[#9A9A9A]'}`}
+              >
+                <X size={20} />
+              </button>
+            </div>
+            {(scenario.collaborators?.length || 0) === 0 && (friends?.length || 0) > 0 ? (
+              <p className={`text-xs ${theme.textSub} mb-4 flex items-start gap-2`}>
+                <UserCircle2 size={16} className="shrink-0 mt-0.5" />
+                Add people to this trip via the share button first — then you can assign items to them.
+              </p>
+            ) : null}
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
+              <AssigneeBtn
+                user={me}
+                active={assigningItem.assignedTo === 'me' || !assigningItem.assignedTo}
+                onClick={() => handleAssignItem('me')}
+                theme={theme}
+              />
+              {(scenario.collaborators || [])
+                .map((fid) => {
+                  const u = friends.find((f) => f.id === fid);
+                  if (!u) return null;
+                  return (
+                    <AssigneeBtn
+                      key={fid}
+                      user={u}
+                      active={assigningItem.assignedTo === fid}
+                      onClick={() => handleAssignItem(fid)}
+                      theme={theme}
+                    />
+                  );
+                })
+                .filter(Boolean)}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

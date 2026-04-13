@@ -4,15 +4,15 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #FFFBF5; /* 預設莫蘭迪背景 */
+  background-color: #FFFBF5;
 }
 
-/* 隱藏滾動條但保留滾動功能 (給手機 APP 沉浸感) */
+/* Hide scrollbars while keeping scroll (mobile-style shell) */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }

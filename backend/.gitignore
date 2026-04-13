@@ -1,0 +1,8 @@
+checkmate.db
+.env
+__pycache__/
+*.py[cod]
+instance/
+.venv/
+venv/
+.env

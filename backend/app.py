@@ -11,6 +11,7 @@ import random
 import re
 import ssl
 import string
+import traceback
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -216,11 +217,11 @@ def _database_uri() -> str:
             return "mysql+pymysql://" + url[len("mysql://") :]
         return url
 
-    u = _env_first("MYSQL_USER", "USER", default="root")
-    p = _env_first("MYSQL_PASSWORD", "PASSWORD", default="")
-    h = _env_first("MYSQL_HOST", default="127.0.0.1")
-    port = _env_first("MYSQL_PORT", "PORT", default="3306")
-    database = _env_first("MYSQL_DATABASE", "DATABASE", default="defaultdb")
+    u = (os.environ.get("MYSQL_USER") or os.environ.get("USER") or "root").strip()
+    p = (os.environ.get("MYSQL_PASSWORD") or os.environ.get("PASSWORD") or "").strip()
+    h = (os.environ.get("MYSQL_HOST") or "127.0.0.1").strip()
+    port = (os.environ.get("MYSQL_PORT") or os.environ.get("PORT") or "3306").strip()
+    database = (os.environ.get("MYSQL_DATABASE") or os.environ.get("DATABASE") or "defaultdb").strip()
 
     return (
         f"mysql+pymysql://{quote_plus(u)}:{quote_plus(p)}@{h}:{port}/"
@@ -249,7 +250,7 @@ def _mysql_use_ssl(uri: str) -> bool:
         "VERIFY_IDENTITY",
     ):
         return True
-    host = _env_first("MYSQL_HOST", default="").lower()
+    host = (os.environ.get("MYSQL_HOST") or "").strip().lower()
     if "aivencloud.com" in host or "aiven" in host:
         return True
     if uri.startswith("mysql+pymysql://"):
@@ -291,6 +292,7 @@ def _decode_token(token: str) -> int | None:
         uid = data.get("sub")
         return int(uid) if uid is not None else None
     except (jwt.PyJWTError, ValueError, TypeError):
+        print(traceback.format_exc())
         return None
 
 
@@ -304,7 +306,14 @@ def get_current_user() -> User | None:
     uid = _decode_token(token)
     if uid is None:
         return None
-    return User.query.get(uid)
+    try:
+        user = User.query.get(uid)
+    except Exception:
+        print(traceback.format_exc())
+        return None
+    if user is None:
+        print(f"[checkmate auth] JWT decoded ok (uid={uid}) but no matching user row in DB.")
+    return user
 
 
 def require_auth(fn):
@@ -2154,6 +2163,8 @@ def _ensure_scenarios_archived_column() -> None:
 
 def create_app() -> Flask:
     app = Flask(__name__)
+    _mysql_host_env = os.environ.get("MYSQL_HOST") or ""
+    print(f"[checkmate] MYSQL_HOST env first 5 chars: {_mysql_host_env[:5]!r}")
     database_uri = _database_uri()
     app.config["SQLALCHEMY_DATABASE_URI"] = database_uri
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = _sqlalchemy_engine_options(database_uri)

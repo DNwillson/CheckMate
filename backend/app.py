@@ -2161,11 +2161,12 @@ def create_app() -> Flask:
     app.config["JSON_SORT_KEYS"] = False
 
     db.init_app(app)
-    CORS(
-        app,
-        resources={r"/api/*": {"origins": "*"}},
-        allow_headers=["Content-Type", "Authorization"],
-    )
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": "*",
+            "allow_headers": ["Content-Type", "Authorization"]
+        }
+    })
 
     with app.app_context():
         db.create_all()

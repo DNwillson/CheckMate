@@ -68,12 +68,15 @@ const HomeDashboard = ({
   }, [t]);
 
   const comfort = weather?.comfort || '—';
-  const live = weather?.source === 'open-meteo' || weather?.source === 'weatherapi';
+  const live =
+    weather?.source === 'open-meteo' || weather?.source === 'weatherapi' || weather?.source === 'tomorrowio';
   const weatherSourceLabel = useMemo(() => {
     const source = String(weather?.source || '').toLowerCase();
     if (source === 'open-meteo') return 'Open-Meteo';
     if (source === 'weatherapi') return 'WeatherAPI.com';
-    return t?.('weatherSourceUnknown') || 'Forecast source';
+    if (source === 'tomorrowio') return 'Tomorrow.io';
+    if (source === 'system-fallback') return t?.('weatherSourceFallback') || 'System fallback';
+    return t?.('weatherSourceUnknown') || 'Source unavailable';
   }, [weather?.source, t]);
   const hint =
     weather?.packingHint || (weatherLoading ? 'Fetching live forecast…' : 'Tap refresh to load weather.');

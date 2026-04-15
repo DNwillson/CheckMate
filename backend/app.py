@@ -1709,6 +1709,167 @@ def _weatherapi_forecast(
     return out
 
 
+def _tomorrowio_key() -> str:
+    return (os.environ.get("TOMORROW_API_KEY") or "").strip()
+
+
+def _tomorrowio_to_wmo(code_raw: Any) -> int:
+    code = int(code_raw or 0)
+    mapping: dict[int, int] = {
+        1000: 0,   # Clear
+        1100: 1,   # Mostly Clear
+        1101: 2,   # Partly Cloudy
+        1102: 3,   # Mostly Cloudy
+        1001: 3,   # Cloudy
+        2000: 45,  # Fog
+        2100: 45,  # Light Fog
+        4000: 51,  # Drizzle
+        4001: 63,  # Rain
+        4200: 61,  # Light Rain
+        4201: 65,  # Heavy Rain
+        5000: 73,  # Snow
+        5001: 71,  # Flurries
+        5100: 71,  # Light Snow
+        5101: 75,  # Heavy Snow
+        6000: 56,  # Freezing Drizzle
+        6001: 66,  # Freezing Rain
+        6200: 66,  # Light Freezing Rain
+        6201: 67,  # Heavy Freezing Rain
+        7000: 77,  # Ice Pellets
+        7101: 77,  # Heavy Ice Pellets
+        7102: 77,  # Light Ice Pellets
+        8000: 95,  # Thunderstorm
+    }
+    return mapping.get(code, 1)
+
+
+def _tomorrowio_forecast(
+    lat: float,
+    lon: float,
+    location_label: str,
+    *,
+    location_detail: str | None = None,
+    days: int = 7,
+) -> dict[str, Any]:
+    key = _tomorrowio_key()
+    if not key:
+        raise RuntimeError("TOMORROW_API_KEY is not set")
+
+    fields = (
+        "temperature,temperatureApparent,humidity,windSpeed,windDirection,uvIndex,"
+        "weatherCode,precipitationProbability,isDayTime,temperatureMax,temperatureMin,"
+        "weatherCodeMax,precipitationProbabilityAvg,sunriseTime,sunsetTime"
+    )
+    location_q = quote_plus(f"{lat},{lon}")
+    timesteps_q = quote_plus("current,1h,1d")
+    url = (
+        "https://api.tomorrow.io/v4/timelines"
+        f"?location={location_q}"
+        f"&fields={quote_plus(fields)}"
+        f"&timesteps={timesteps_q}"
+        "&units=metric&timezone=auto"
+        f"&apikey={quote_plus(key)}"
+    )
+    data = _http_get_json(url, timeout=25)
+    timelines = (data.get("data") or {}).get("timelines") or []
+    by_step: dict[str, list[dict[str, Any]]] = {}
+    for tl in timelines:
+        step = str(tl.get("timestep") or "")
+        by_step[step] = list(tl.get("intervals") or [])
+
+    current_rows = by_step.get("current") or []
+    if not current_rows:
+        raise RuntimeError("Tomorrow.io returned no current conditions")
+    cur_vals = (current_rows[0].get("values") or {})
+
+    t = cur_vals.get("temperature")
+    temp = float(t) if t is not None else 22.0
+    apparent_raw = cur_vals.get("temperatureApparent")
+    apparent = float(apparent_raw) if apparent_raw is not None else None
+    humidity_raw = cur_vals.get("humidity")
+    humidity = int(humidity_raw) if humidity_raw is not None else None
+    wind_raw = cur_vals.get("windSpeed")
+    wind = float(wind_raw) if wind_raw is not None else None
+    wind_dir_raw = cur_vals.get("windDirection")
+    wind_dir = int(wind_dir_raw) if wind_dir_raw is not None else None
+    uv_raw = cur_vals.get("uvIndex")
+    uv = float(uv_raw) if uv_raw is not None else None
+    is_day = bool(cur_vals.get("isDayTime"))
+    code = _tomorrowio_to_wmo(cur_vals.get("weatherCode"))
+    condition = _wmo_weather_label(code)
+    comfort = _comfort_label(apparent, temp)
+    hint = _weather_packing_hint(code, uv, wind, is_day, apparent)
+
+    out: dict[str, Any] = {
+        "location": location_label,
+        "locationDetail": location_detail,
+        "coordinatesLabel": _format_latlon_human(lat, lon),
+        "latitude": round(lat, 4),
+        "longitude": round(lon, 4),
+        "temp": round(temp),
+        "tempUnit": "C",
+        "apparentTemp": round(apparent) if apparent is not None else None,
+        "condition": condition,
+        "weatherCode": code,
+        "iconKey": _wmo_icon_key(code),
+        "humidity": humidity,
+        "windKmh": round(wind, 1) if wind is not None else None,
+        "windDeg": wind_dir,
+        "uvIndex": round(uv, 1) if uv is not None else None,
+        "isDay": is_day,
+        "comfort": comfort,
+        "packingHint": hint,
+        "source": "tomorrowio",
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+    }
+
+    hourly_out: list[dict[str, Any]] = []
+    for row in (by_step.get("1h") or [])[:24]:
+        vals = row.get("values") or {}
+        h_code = _tomorrowio_to_wmo(vals.get("weatherCode"))
+        p = vals.get("precipitationProbability")
+        hourly_out.append(
+            {
+                "time": row.get("startTime"),
+                "temp": round(float(vals.get("temperature"))) if vals.get("temperature") is not None else None,
+                "precipProb": int(p) if p is not None else None,
+                "weatherCode": h_code,
+                "condition": _wmo_weather_label(h_code),
+                "iconKey": _wmo_icon_key(h_code),
+                "humidity": int(vals.get("humidity")) if vals.get("humidity") is not None else None,
+                "windKmh": round(float(vals.get("windSpeed")), 1) if vals.get("windSpeed") is not None else None,
+            }
+        )
+
+    daily_out: list[dict[str, Any]] = []
+    for row in (by_step.get("1d") or [])[: max(1, min(days, 7))]:
+        vals = row.get("values") or {}
+        d_code = _tomorrowio_to_wmo(vals.get("weatherCodeMax") or vals.get("weatherCode"))
+        p_avg = vals.get("precipitationProbabilityAvg")
+        daily_out.append(
+            {
+                "date": str(row.get("startTime") or "")[:10],
+                "max": round(float(vals.get("temperatureMax"))) if vals.get("temperatureMax") is not None else None,
+                "min": round(float(vals.get("temperatureMin"))) if vals.get("temperatureMin") is not None else None,
+                "weatherCode": d_code,
+                "condition": _wmo_weather_label(d_code),
+                "iconKey": _wmo_icon_key(d_code),
+                "precipMm": None,
+                "precipProbMax": int(p_avg) if p_avg is not None else None,
+                "uvIndexMax": None,
+                "sunrise": vals.get("sunriseTime"),
+                "sunset": vals.get("sunsetTime"),
+            }
+        )
+
+    if hourly_out:
+        out["hourly"] = hourly_out
+    if daily_out:
+        out["daily"] = daily_out
+    out["timezone"] = data.get("timezone")
+    return out
+
+
 def _weather_current_with_fallback(
     lat: float, lon: float, location_label: str, *, location_detail: str | None = None
 ) -> dict[str, Any]:
@@ -1716,9 +1877,15 @@ def _weather_current_with_fallback(
         return _open_meteo_current(lat, lon, location_label, location_detail=location_detail)
     except Exception as e:
         logger.warning("Open-Meteo current failed, trying WeatherAPI: %s", e)
-        return _weatherapi_forecast(
-            lat, lon, location_label, location_detail=location_detail, days=1
-        )
+        try:
+            return _weatherapi_forecast(
+                lat, lon, location_label, location_detail=location_detail, days=1
+            )
+        except Exception as e2:
+            logger.warning("WeatherAPI current failed, trying Tomorrow.io: %s", e2)
+            return _tomorrowio_forecast(
+                lat, lon, location_label, location_detail=location_detail, days=1
+            )
 
 
 def _weather_detail_with_fallback(
@@ -1728,9 +1895,52 @@ def _weather_detail_with_fallback(
         return _open_meteo_forecast_detail(lat, lon, location, location_detail)
     except Exception as e:
         logger.warning("Open-Meteo detail failed, trying WeatherAPI: %s", e)
-        return _weatherapi_forecast(
-            lat, lon, location, location_detail=location_detail, days=7
-        )
+        try:
+            return _weatherapi_forecast(
+                lat, lon, location, location_detail=location_detail, days=7
+            )
+        except Exception as e2:
+            logger.warning("WeatherAPI detail failed, trying Tomorrow.io: %s", e2)
+            return _tomorrowio_forecast(
+                lat, lon, location, location_detail=location_detail, days=7
+            )
+
+
+def _weather_unavailable_payload(
+    lat: float,
+    lon: float,
+    location_label: str,
+    *,
+    location_detail: str | None = None,
+    include_detail: bool = False,
+) -> dict[str, Any]:
+    base: dict[str, Any] = {
+        "location": location_label or "—",
+        "locationDetail": location_detail,
+        "coordinatesLabel": _format_latlon_human(lat, lon),
+        "latitude": round(lat, 4),
+        "longitude": round(lon, 4),
+        "temp": 22,
+        "tempUnit": "C",
+        "apparentTemp": None,
+        "condition": "Unavailable",
+        "weatherCode": 3,
+        "iconKey": "cloud",
+        "humidity": None,
+        "windKmh": None,
+        "windDeg": None,
+        "uvIndex": None,
+        "isDay": True,
+        "comfort": "—",
+        "packingHint": "Weather providers are temporarily unavailable. Try again later.",
+        "source": "system-fallback",
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+    }
+    if include_detail:
+        base["timezone"] = None
+        base["hourly"] = []
+        base["daily"] = []
+    return base
 
 
 def _weather_resolve_from_request(req: Any) -> tuple[float, float, str, str | None]:
@@ -2820,7 +3030,11 @@ def create_app() -> Flask:
             return jsonify({"error": msg}), code
         except Exception as e:
             logger.warning("Weather fetch failed: %s", e)
-            return jsonify({"error": "Weather service temporarily unavailable."}), 502
+            try:
+                la, lo, loc, det = _weather_resolve_from_request(request)
+            except Exception:
+                la, lo, loc, det = 0.0, 0.0, "—", None
+            return jsonify(_weather_unavailable_payload(la, lo, loc, location_detail=det))
 
     @app.get("/api/weather/detail")
     @require_auth
@@ -2835,7 +3049,15 @@ def create_app() -> Flask:
             return jsonify({"error": msg}), code
         except Exception as e:
             logger.warning("Weather detail failed: %s", e)
-            return jsonify({"error": "Weather service temporarily unavailable."}), 502
+            try:
+                la, lo, loc, det = _weather_resolve_from_request(request)
+            except Exception:
+                la, lo, loc, det = 0.0, 0.0, "—", None
+            return jsonify(
+                _weather_unavailable_payload(
+                    la, lo, loc, location_detail=det, include_detail=True
+                )
+            )
 
     @app.get("/api/scenarios")
     @require_auth

@@ -256,6 +256,7 @@ export const WEATHER_FALLBACK = {
   packingHint: 'Connect to the internet and refresh to load live weather.',
   iconKey: 'cloud',
   isDay: true,
+  source: 'system-fallback',
 };
 
 /** @deprecated use WEATHER_FALLBACK */

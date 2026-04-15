@@ -1541,6 +1541,198 @@ def _open_meteo_forecast_detail(
     }
 
 
+def _weatherapi_key() -> str:
+    return (os.environ.get("WEATHERAPI_KEY") or "").strip()
+
+
+def _weatherapi_code_from_text(text: str) -> int:
+    s = (text or "").strip().lower()
+    if not s:
+        return 0
+    if "thunder" in s or "storm" in s:
+        return 95
+    if "snow" in s or "sleet" in s or "ice" in s or "blizzard" in s:
+        return 73
+    if "rain" in s or "drizzle" in s or "shower" in s:
+        return 63
+    if "fog" in s or "mist" in s or "haze" in s:
+        return 45
+    if "overcast" in s:
+        return 3
+    if "cloud" in s:
+        return 2
+    if "clear" in s or "sunny" in s:
+        return 0
+    return 1
+
+
+def _weatherapi_geocode_place(name: str) -> tuple[float, float, str]:
+    key = _weatherapi_key()
+    if not key:
+        raise RuntimeError("WEATHERAPI_KEY is not set")
+    q = quote_plus(name.strip())
+    if not q:
+        raise ValueError("Empty place name")
+    url = f"https://api.weatherapi.com/v1/search.json?key={quote_plus(key)}&q={q}"
+    rows = _http_get_json(url, timeout=15)
+    if not rows:
+        raise ValueError(f"Place not found: {name.strip()}")
+    row = rows[0] or {}
+    lat = float(row.get("lat"))
+    lon = float(row.get("lon"))
+    city = str(row.get("name") or name).strip()
+    region = str(row.get("region") or "").strip()
+    country = str(row.get("country") or "").strip()
+    label_parts = [city]
+    if region and region != city:
+        label_parts.append(region)
+    if country:
+        label_parts.append(country)
+    return lat, lon, ", ".join(label_parts)
+
+
+def _weatherapi_forecast(
+    lat: float,
+    lon: float,
+    location_label: str,
+    *,
+    location_detail: str | None = None,
+    days: int = 7,
+) -> dict[str, Any]:
+    key = _weatherapi_key()
+    if not key:
+        raise RuntimeError("WEATHERAPI_KEY is not set")
+    q = f"{lat},{lon}"
+    url = (
+        f"https://api.weatherapi.com/v1/forecast.json?key={quote_plus(key)}&q={quote_plus(q)}"
+        f"&days={max(1, min(days, 10))}&aqi=no&alerts=no"
+    )
+    data = _http_get_json(url, timeout=25)
+    cur = data.get("current") or {}
+    loc = data.get("location") or {}
+    fc = (data.get("forecast") or {}).get("forecastday") or []
+    if not cur:
+        raise RuntimeError("WeatherAPI returned no current conditions")
+
+    cond = (cur.get("condition") or {}).get("text") or "Mixed conditions"
+    code = _weatherapi_code_from_text(cond)
+    temp = float(cur.get("temp_c"))
+    apparent = cur.get("feelslike_c")
+    apparent_f = float(apparent) if apparent is not None else None
+    humidity = cur.get("humidity")
+    hum_i = int(humidity) if humidity is not None else None
+    wind = cur.get("wind_kph")
+    wind_f = float(wind) if wind is not None else None
+    wind_dir = cur.get("wind_degree")
+    wind_dir_i = int(wind_dir) if wind_dir is not None else None
+    uv_raw = cur.get("uv")
+    uv = float(uv_raw) if uv_raw is not None else None
+    is_day = bool(int(cur.get("is_day") or 0))
+    comfort = _comfort_label(apparent_f, temp)
+    hint = _weather_packing_hint(code, uv, wind_f, is_day, apparent_f)
+
+    out = {
+        "location": location_label,
+        "locationDetail": location_detail,
+        "coordinatesLabel": _format_latlon_human(lat, lon),
+        "latitude": round(lat, 4),
+        "longitude": round(lon, 4),
+        "temp": round(temp),
+        "tempUnit": "C",
+        "apparentTemp": round(apparent_f) if apparent_f is not None else None,
+        "condition": str(cond).strip(),
+        "weatherCode": code,
+        "iconKey": _wmo_icon_key(code),
+        "humidity": hum_i,
+        "windKmh": round(wind_f, 1) if wind_f is not None else None,
+        "windDeg": wind_dir_i,
+        "uvIndex": round(uv, 1) if uv is not None else None,
+        "isDay": is_day,
+        "comfort": comfort,
+        "packingHint": hint,
+        "source": "weatherapi",
+        "updatedAt": datetime.now(timezone.utc).isoformat(),
+    }
+
+    if not fc:
+        return out
+
+    hourly_out: list[dict[str, Any]] = []
+    for day in fc:
+        for h in (day.get("hour") or []):
+            if len(hourly_out) >= 24:
+                break
+            h_cond = ((h.get("condition") or {}).get("text") or "").strip()
+            h_code = _weatherapi_code_from_text(h_cond)
+            hourly_out.append(
+                {
+                    "time": h.get("time"),
+                    "temp": round(float(h.get("temp_c"))) if h.get("temp_c") is not None else None,
+                    "precipProb": int(h.get("chance_of_rain")) if h.get("chance_of_rain") is not None else None,
+                    "weatherCode": h_code,
+                    "condition": h_cond or _wmo_weather_label(h_code),
+                    "iconKey": _wmo_icon_key(h_code),
+                    "humidity": int(h.get("humidity")) if h.get("humidity") is not None else None,
+                    "windKmh": round(float(h.get("wind_kph")), 1) if h.get("wind_kph") is not None else None,
+                }
+            )
+        if len(hourly_out) >= 24:
+            break
+
+    daily_out: list[dict[str, Any]] = []
+    for day in fc[:7]:
+        d = day.get("day") or {}
+        d_cond = ((d.get("condition") or {}).get("text") or "").strip()
+        d_code = _weatherapi_code_from_text(d_cond)
+        sunrise_raw = ((day.get("astro") or {}).get("sunrise") or "").strip()
+        sunset_raw = ((day.get("astro") or {}).get("sunset") or "").strip()
+        date_s = str(day.get("date") or "").strip()
+        daily_out.append(
+            {
+                "date": date_s,
+                "max": round(float(d.get("maxtemp_c"))) if d.get("maxtemp_c") is not None else None,
+                "min": round(float(d.get("mintemp_c"))) if d.get("mintemp_c") is not None else None,
+                "weatherCode": d_code,
+                "condition": d_cond or _wmo_weather_label(d_code),
+                "iconKey": _wmo_icon_key(d_code),
+                "precipMm": round(float(d.get("totalprecip_mm")), 1) if d.get("totalprecip_mm") is not None else None,
+                "precipProbMax": int(d.get("daily_chance_of_rain")) if d.get("daily_chance_of_rain") is not None else None,
+                "uvIndexMax": round(float(d.get("uv")), 1) if d.get("uv") is not None else None,
+                "sunrise": f"{date_s} {sunrise_raw}".strip() if sunrise_raw else None,
+                "sunset": f"{date_s} {sunset_raw}".strip() if sunset_raw else None,
+            }
+        )
+
+    out["timezone"] = loc.get("tz_id")
+    out["hourly"] = hourly_out
+    out["daily"] = daily_out
+    return out
+
+
+def _weather_current_with_fallback(
+    lat: float, lon: float, location_label: str, *, location_detail: str | None = None
+) -> dict[str, Any]:
+    try:
+        return _open_meteo_current(lat, lon, location_label, location_detail=location_detail)
+    except Exception as e:
+        logger.warning("Open-Meteo current failed, trying WeatherAPI: %s", e)
+        return _weatherapi_forecast(
+            lat, lon, location_label, location_detail=location_detail, days=1
+        )
+
+
+def _weather_detail_with_fallback(
+    lat: float, lon: float, location: str, location_detail: str | None
+) -> dict[str, Any]:
+    try:
+        return _open_meteo_forecast_detail(lat, lon, location, location_detail)
+    except Exception as e:
+        logger.warning("Open-Meteo detail failed, trying WeatherAPI: %s", e)
+        return _weatherapi_forecast(
+            lat, lon, location, location_detail=location_detail, days=7
+        )
+
+
 def _weather_resolve_from_request(req: Any) -> tuple[float, float, str, str | None]:
     """Parse ?lat=&lon= | ?city= | defaults. Returns (lat, lon, location, location_detail)."""
     lat_q = req.args.get("lat", type=float)
@@ -1555,8 +1747,13 @@ def _weather_resolve_from_request(req: Any) -> tuple[float, float, str, str | No
         return (lat_q, lon_q, loc, det)
 
     if city:
-        la, lo, loc = _geocode_place(city)
-        return (la, lo, loc, None)
+        try:
+            la, lo, loc = _geocode_place(city)
+            return (la, lo, loc, None)
+        except Exception as e:
+            logger.warning("Open-Meteo geocoding failed, trying WeatherAPI: %s", e)
+            la, lo, loc = _weatherapi_geocode_place(city)
+            return (la, lo, loc, None)
 
     lat_env = os.environ.get("WEATHER_DEFAULT_LAT", "").strip()
     lon_env = os.environ.get("WEATHER_DEFAULT_LON", "").strip()
@@ -2616,7 +2813,7 @@ def create_app() -> Flask:
         """
         try:
             la, lo, loc, det = _weather_resolve_from_request(request)
-            return jsonify(_open_meteo_current(la, lo, loc, location_detail=det))
+            return jsonify(_weather_current_with_fallback(la, lo, loc, location_detail=det))
         except ValueError as e:
             msg = str(e)
             code = 400 if "Invalid coordinates" in msg else 404
@@ -2631,7 +2828,7 @@ def create_app() -> Flask:
         """Extended forecast: 24h hourly steps + 7-day daily (same query rules as /api/weather)."""
         try:
             la, lo, loc, det = _weather_resolve_from_request(request)
-            return jsonify(_open_meteo_forecast_detail(la, lo, loc, det))
+            return jsonify(_weather_detail_with_fallback(la, lo, loc, det))
         except ValueError as e:
             msg = str(e)
             code = 400 if "Invalid coordinates" in msg else 404

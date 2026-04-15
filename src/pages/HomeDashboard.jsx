@@ -68,7 +68,13 @@ const HomeDashboard = ({
   }, [t]);
 
   const comfort = weather?.comfort || '—';
-  const live = weather?.source === 'open-meteo';
+  const live = weather?.source === 'open-meteo' || weather?.source === 'weatherapi';
+  const weatherSourceLabel = useMemo(() => {
+    const source = String(weather?.source || '').toLowerCase();
+    if (source === 'open-meteo') return 'Open-Meteo';
+    if (source === 'weatherapi') return 'WeatherAPI.com';
+    return t?.('weatherSourceUnknown') || 'Forecast source';
+  }, [weather?.source, t]);
   const hint =
     weather?.packingHint || (weatherLoading ? 'Fetching live forecast…' : 'Tap refresh to load weather.');
   const tempUnit = weather?.tempUnit || 'C';
@@ -256,9 +262,19 @@ const HomeDashboard = ({
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-1">
-              <div className="flex items-center gap-1.5 text-sky-700/90">
+              <div className="flex items-center gap-1.5 text-sky-700/90 flex-wrap">
                 <MapPin size={14} className="shrink-0" strokeWidth={2.5} />
                 <span className="text-[11px] font-bold uppercase tracking-wider">{t?.('now') || 'Now'}</span>
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide uppercase border ${
+                    theme.isDark
+                      ? 'bg-slate-800/70 text-slate-200 border-slate-700/80'
+                      : 'bg-white/85 text-slate-600 border-slate-200/90'
+                  }`}
+                  title={`Data by ${weatherSourceLabel}`}
+                >
+                  {weatherSourceLabel}
+                </span>
               </div>
               <h2 className={`text-lg sm:text-xl font-bold ${theme.textMain} leading-snug break-words`}>
                 {weather?.location || '—'}

@@ -78,6 +78,8 @@ class Scenario(db.Model):
     items = db.Column(db.JSON, nullable=False, default=list)
     collaborators = db.Column(db.JSON, nullable=False, default=list)
     archived = db.Column(db.Boolean, nullable=False, default=False)
+    trip_start_at = db.Column(db.DateTime, nullable=True)
+    trip_end_at = db.Column(db.DateTime, nullable=True)
 
     def to_dict(self) -> dict:
         return {
@@ -89,6 +91,8 @@ class Scenario(db.Model):
             "items": self.items or [],
             "collaborators": self.collaborators or [],
             "archived": bool(self.archived),
+            "trip_start_at": self.trip_start_at.isoformat() if self.trip_start_at else None,
+            "trip_end_at": self.trip_end_at.isoformat() if self.trip_end_at else None,
         }
 
 
@@ -148,12 +152,19 @@ class HistoryRecord(db.Model):
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    scenario_id = db.Column(db.String(64), nullable=True, index=True)
     name = db.Column(db.String(200), nullable=False)
     date = db.Column(db.String(120), nullable=False)
     status = db.Column(db.String(32), nullable=False, default="completed")
 
     def to_dict(self) -> dict:
-        return {"id": self.id, "name": self.name, "date": self.date, "status": self.status}
+        return {
+            "id": self.id,
+            "scenario_id": self.scenario_id,
+            "name": self.name,
+            "date": self.date,
+            "status": self.status,
+        }
 
 
 ALLOWED_THEME_KEYS = frozenset({"cinnamon", "hazeBlue", "sageGreen"})
@@ -187,6 +198,20 @@ def _normalize_prefs_blob(raw: Any) -> dict[str, Any]:
     lang = str(raw.get("language", "en")).strip().lower()
     out["language"] = "zh" if lang in ("zh", "zh-cn", "zh_cn", "zh-hans", "chs") else "en"
     return out
+
+
+def _parse_iso_datetime(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    s = str(value).strip()
+    if not s:
+        return None
+    # Accept both "2026-04-20T09:30" and full ISO values.
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    return datetime.fromisoformat(s)
 
 
 class AppPreference(db.Model):
@@ -2163,6 +2188,49 @@ def _ensure_scenarios_archived_column() -> None:
         logger.debug("scenarios.archived ensure skipped: %s", e)
 
 
+def _ensure_scenarios_trip_datetime_columns() -> None:
+    try:
+        insp = inspect(db.engine)
+        if "scenarios" not in insp.get_table_names():
+            return
+        col_names = {c["name"] for c in insp.get_columns("scenarios")}
+        with db.engine.begin() as conn:
+            if "trip_start_at" not in col_names:
+                conn.execute(text("ALTER TABLE scenarios ADD COLUMN trip_start_at DATETIME NULL"))
+                logger.info("Added scenarios.trip_start_at column.")
+            if "trip_end_at" not in col_names:
+                conn.execute(text("ALTER TABLE scenarios ADD COLUMN trip_end_at DATETIME NULL"))
+                logger.info("Added scenarios.trip_end_at column.")
+    except Exception as e:
+        logger.debug("scenarios.trip datetime ensure skipped: %s", e)
+
+
+def _ensure_history_records_scenario_id_column() -> None:
+    try:
+        insp = inspect(db.engine)
+        if "history_records" not in insp.get_table_names():
+            return
+        col_names = {c["name"] for c in insp.get_columns("history_records")}
+        if "scenario_id" in col_names:
+            return
+        with db.engine.begin() as conn:
+            conn.execute(text("ALTER TABLE history_records ADD COLUMN scenario_id VARCHAR(64) NULL"))
+        logger.info("Added history_records.scenario_id column.")
+    except Exception as e:
+        logger.debug("history_records.scenario_id ensure skipped: %s", e)
+
+
+def _history_has_scenario_id_column() -> bool:
+    try:
+        insp = inspect(db.engine)
+        if "history_records" not in insp.get_table_names():
+            return False
+        col_names = {c["name"] for c in insp.get_columns("history_records")}
+        return "scenario_id" in col_names
+    except Exception:
+        return False
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
     _mysql_host_env = os.environ.get("MYSQL_HOST") or ""
@@ -2188,6 +2256,8 @@ def create_app() -> Flask:
         _ensure_user_display_name_column()
         _ensure_scenario_shares_can_edit_column()
         _ensure_scenarios_archived_column()
+        _ensure_scenarios_trip_datetime_columns()
+        _ensure_history_records_scenario_id_column()
         _purge_unlinked_friend_rows()
 
     @app.get("/api/health")
@@ -2560,6 +2630,13 @@ def create_app() -> Flask:
         sid = str(payload.get("id") or _new_id("s"))
         icon = payload.get("icon") or "Backpack"
         theme = payload.get("theme")
+        try:
+            trip_start_at = _parse_iso_datetime(payload.get("trip_start_at"))
+            trip_end_at = _parse_iso_datetime(payload.get("trip_end_at"))
+        except Exception:
+            return jsonify({"error": "Invalid trip date/time format."}), 400
+        if trip_start_at and trip_end_at and trip_end_at < trip_start_at:
+            return jsonify({"error": "Trip end time must be after start time."}), 400
         row = Scenario(
             user_id=uid,
             id=sid,
@@ -2570,6 +2647,8 @@ def create_app() -> Flask:
             items=items,
             collaborators=[],
             archived=False,
+            trip_start_at=trip_start_at,
+            trip_end_at=trip_end_at,
         )
         db.session.add(row)
         db.session.commit()
@@ -2593,8 +2672,17 @@ def create_app() -> Flask:
                 return jsonify({"error": "not found"}), 404
         payload = request.get_json(force=True, silent=True) or {}
         is_owner = row.user_id == uid
-        allowed = ("items",) if not is_owner else ("name", "icon", "theme", "items", "collaborators", "archived")
-        if not is_owner and any(k in payload for k in ("name", "icon", "theme", "collaborators", "type")):
+        allowed = ("items",) if not is_owner else (
+            "name",
+            "icon",
+            "theme",
+            "items",
+            "collaborators",
+            "archived",
+            "trip_start_at",
+            "trip_end_at",
+        )
+        if not is_owner and any(k in payload for k in ("name", "icon", "theme", "collaborators", "type", "trip_start_at", "trip_end_at")):
             return jsonify({"error": "Only the owner can edit list settings."}), 403
 
         # Validate assignees based on collaborators on the owner's list.
@@ -2605,7 +2693,20 @@ def create_app() -> Flask:
             if msg:
                 return jsonify({"error": msg}), 400
 
+        if is_owner and ("trip_start_at" in payload or "trip_end_at" in payload):
+            try:
+                next_start = _parse_iso_datetime(payload.get("trip_start_at", row.trip_start_at))
+                next_end = _parse_iso_datetime(payload.get("trip_end_at", row.trip_end_at))
+            except Exception:
+                return jsonify({"error": "Invalid trip date/time format."}), 400
+            if next_start and next_end and next_end < next_start:
+                return jsonify({"error": "Trip end time must be after start time."}), 400
+            row.trip_start_at = next_start
+            row.trip_end_at = next_end
+
         for key in allowed:
+            if key in ("trip_start_at", "trip_end_at"):
+                continue
             if key in payload:
                 setattr(row, key, payload[key])
         if "type" in payload and row.type == "custom":
@@ -2678,12 +2779,31 @@ def create_app() -> Flask:
     @require_auth
     def list_history():
         uid = g.current_user.id
-        rows = (
-            HistoryRecord.query.filter_by(user_id=uid)
-            .order_by(HistoryRecord.id.desc())
-            .all()
+        if _history_has_scenario_id_column():
+            rows = (
+                HistoryRecord.query.filter_by(user_id=uid)
+                .order_by(HistoryRecord.id.desc())
+                .all()
+            )
+            return jsonify([r.to_dict() for r in rows])
+
+        # Backward-compatible fallback when DB migration has not added scenario_id yet.
+        q = text(
+            "SELECT id, user_id, name, date, status "
+            "FROM history_records WHERE user_id=:uid ORDER BY id DESC"
         )
-        return jsonify([r.to_dict() for r in rows])
+        rows = db.session.execute(q, {"uid": uid}).mappings().all()
+        out = [
+            {
+                "id": int(r["id"]),
+                "scenario_id": None,
+                "name": r["name"],
+                "date": r["date"],
+                "status": r["status"],
+            }
+            for r in rows
+        ]
+        return jsonify(out)
 
     @app.post("/api/history")
     @require_auth
@@ -2691,26 +2811,40 @@ def create_app() -> Flask:
         uid = g.current_user.id
         payload = request.get_json(force=True, silent=True) or {}
         name = (payload.get("name") or "").strip()
+        scenario_id = str(payload.get("scenario_id") or "").strip() or None
         if not name:
             return jsonify({"error": "name required"}), 400
         now = datetime.now()
         date_str = payload.get("date") or now.strftime("%Y-%m-%d %H:%M")
         status = payload.get("status") or "completed"
-        row = HistoryRecord(
-            user_id=uid, name=name, date=date_str, status=status
+        if _history_has_scenario_id_column():
+            row = HistoryRecord(
+                user_id=uid, scenario_id=scenario_id, name=name, date=date_str, status=status
+            )
+            db.session.add(row)
+            db.session.commit()
+            return jsonify(row.to_dict()), 201
+
+        ins = text(
+            "INSERT INTO history_records (user_id, name, date, status) "
+            "VALUES (:uid, :name, :date, :status)"
         )
-        db.session.add(row)
+        db.session.execute(ins, {"uid": uid, "name": name, "date": date_str, "status": status})
         db.session.commit()
-        return jsonify(row.to_dict()), 201
+        last_id = db.session.execute(text("SELECT LAST_INSERT_ID() AS id")).mappings().first()
+        new_id = int(last_id["id"]) if last_id and last_id.get("id") is not None else 0
+        return jsonify({"id": new_id, "scenario_id": None, "name": name, "date": date_str, "status": status}), 201
 
     @app.delete("/api/history/<int:record_id>")
     @require_auth
     def delete_history_record(record_id: int):
         uid = g.current_user.id
-        row = HistoryRecord.query.filter_by(user_id=uid, id=record_id).first()
-        if not row:
+        res = db.session.execute(
+            text("DELETE FROM history_records WHERE user_id=:uid AND id=:rid"),
+            {"uid": uid, "rid": record_id},
+        )
+        if getattr(res, "rowcount", 0) <= 0:
             return jsonify({"error": "not found"}), 404
-        db.session.delete(row)
         db.session.commit()
         return "", 204
 

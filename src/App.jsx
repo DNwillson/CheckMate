@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Home as HomeIcon, User, Sparkles } from 'lucide-react';
+import { Home as HomeIcon, User, Sparkles, LayoutGrid, CalendarDays } from 'lucide-react';
 
 import { THEMES, WEATHER_FALLBACK, buildDisplayTheme, DEFAULT_APP_PREFS } from './constants/data';
 import { api, clearToken, getToken } from './api';
 
 import UserLogin from './pages/UserLogin';
 import HomeDashboard from './pages/HomeDashboard';
+import QuickScenariosPage from './pages/QuickScenariosPage';
+import CalendarPage from './pages/CalendarPage';
 import MyProfileAndLibrary from './pages/MyProfileAndLibrary';
 import SystemSettings from './pages/SystemSettings';
 import ChecklistDetail from './pages/ChecklistDetail';
@@ -62,6 +64,7 @@ export default function App() {
   const [appPrefs, setAppPrefs] = useState(DEFAULT_APP_PREFS);
   const [meInitialSegment, setMeInitialSegment] = useState(null);
   const [lastPacked, setLastPacked] = useState(null);
+  const [quickTemplateDraft, setQuickTemplateDraft] = useState(null);
   const appPrefsRef = useRef(DEFAULT_APP_PREFS);
   const currentThemeKeyRef = useRef(currentThemeKey);
 
@@ -244,6 +247,7 @@ export default function App() {
     setSessionRestoring(false);
     setMeInitialSegment(null);
     setLastPacked(null);
+    setQuickTemplateDraft(null);
   }, []);
 
   const handleChangeTheme = async (key) => {
@@ -331,9 +335,10 @@ export default function App() {
       icon: newScenario.icon,
       theme: newScenario.theme,
       items: newScenario.items,
+      trip_start_at: newScenario.trip_start_at ?? null,
+      trip_end_at: newScenario.trip_end_at ?? null,
     });
     await refreshData();
-    setCurrentView(activeTab);
   };
 
   const handleCreateTripFromAssistant = useCallback(
@@ -443,6 +448,28 @@ export default function App() {
     );
   };
 
+  const handleUpdateScenarioSchedule = useCallback(
+    async (scenarioId, payload) => {
+      await api.updateScenario(scenarioId, payload);
+      await refreshData();
+    },
+    [refreshData],
+  );
+
+  const handleCreateTripAtDate = useCallback((isoDate) => {
+    const d = isoDate ? new Date(isoDate) : new Date();
+    const label = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    setQuickTemplateDraft({
+      name: `Trip ${label}`,
+      icon: 'Backpack',
+      theme: { bg: THEME.primaryLight, text: THEME.primaryText },
+      items: [],
+      trip_start_at: isoDate || null,
+      trip_end_at: null,
+    });
+    setCurrentView('create');
+  }, [THEME.primaryLight, THEME.primaryText]);
+
   const handleShareScenario = useCallback(
     async (scenarioId, username) => {
       await api.shareScenario(scenarioId, username);
@@ -479,14 +506,39 @@ export default function App() {
     if (sc?.access === 'shared') return;
     if (sc) {
       if (sc.access === 'owner') {
-        await api.addHistory({ name: sc.name });
-        await api.updateScenario(sc.id, { archived: true });
-        setLastPacked({ name: sc.name, at: new Date().toISOString() });
+        const now = new Date();
+        const start = sc.trip_start_at ? new Date(sc.trip_start_at) : null;
+        const end = sc.trip_end_at ? new Date(sc.trip_end_at) : null;
+        const cutoff = end && !Number.isNaN(end.getTime()) ? end : start;
+        const shouldRecordHistory = !!(cutoff && !Number.isNaN(cutoff.getTime()) && now >= cutoff);
+
+        // Keep trips reusable/editable in My Trips; only log history when scheduled date has passed.
+        if (shouldRecordHistory) {
+          await api.addHistory({ name: sc.name, scenario_id: sc.id });
+          await api.updateScenario(sc.id, { archived: true });
+          setLastPacked({ name: sc.name, at: new Date().toISOString() });
+        } else {
+          setLastPacked(null);
+        }
         await refreshData();
       }
     }
     setCurrentView('success');
   };
+
+  const handleReuseHistoryTrip = useCallback(
+    async (scenarioId) => {
+      const sid = String(scenarioId || '').trim();
+      if (!sid) return;
+      await api.updateScenario(sid, { archived: false });
+      await refreshData();
+      setActiveTab('me');
+      setActiveScenarioOwnerId(null);
+      setActiveScenarioId(sid);
+      setCurrentView('detail');
+    },
+    [refreshData],
+  );
 
   const meProfile = useMemo(() => {
     if (!currentUser) {
@@ -526,13 +578,43 @@ export default function App() {
             onSelect={handleSelectScenario}
             onDelete={handleDeleteScenario}
             onDeleteMany={handleDeleteScenariosBatch}
-            onCreateClick={() => setCurrentView('create')}
+            onCreateClick={() => {
+              setQuickTemplateDraft(null);
+              setCurrentView('create');
+            }}
             onDeleteFriend={handleDeleteFriend}
             onRefresh={refreshData}
             onDeleteHistoryRecord={handleDeleteHistoryRecord}
             onClearHistory={handleClearHistory}
+            onReuseHistoryTrip={handleReuseHistoryTrip}
             initialSegment={meInitialSegment}
             theme={THEME}
+          />
+        );
+
+      case 'quick':
+        return (
+          <QuickScenariosPage
+            scenarios={scenarios}
+            onCreateFromTemplate={async (template) => {
+              setQuickTemplateDraft(template || null);
+              setCurrentView('create');
+            }}
+            theme={THEME}
+            t={t}
+          />
+        );
+
+      case 'calendar':
+        return (
+          <CalendarPage
+            scenarios={scenarios}
+            onSelect={handleSelectScenario}
+            onUpdateScenarioSchedule={handleUpdateScenarioSchedule}
+            onCreateTripAtDate={handleCreateTripAtDate}
+            language={appPrefs?.language || 'en'}
+            theme={THEME}
+            t={t}
           />
         );
 
@@ -593,9 +675,18 @@ export default function App() {
       case 'create':
         return (
           <CreateNewTrip
-            onBack={() => setCurrentView(activeTab)}
+            initialTrip={quickTemplateDraft}
+            language={appPrefs?.language || 'en'}
+            onBack={() => {
+              setQuickTemplateDraft(null);
+              setCurrentView(activeTab);
+            }}
             onSave={async (payload) => {
               await handleSaveTrip({ ...payload, type: 'custom' });
+              setQuickTemplateDraft(null);
+              setMeInitialSegment('scenarios');
+              setActiveTab('me');
+              setCurrentView('me');
             }}
             theme={THEME}
           />
@@ -661,7 +752,7 @@ export default function App() {
           t={t}
         />
 
-        {['home', 'me'].includes(currentView) && (
+        {['home', 'quick', 'calendar', 'me'].includes(currentView) && (
           <div
             className={`h-24 ${THEME.shell} flex justify-around items-center pb-6 px-6 absolute bottom-0 w-full z-10 rounded-t-3xl shadow-[0_-5px_20px_rgba(0,0,0,0.02)]`}
           >
@@ -670,6 +761,14 @@ export default function App() {
               label={t('navHome')}
               active={activeTab === 'home'}
               onClick={() => handleTabChange('home')}
+              theme={THEME}
+            />
+
+            <NavItem
+              icon={LayoutGrid}
+              label={t('navQuick')}
+              active={activeTab === 'quick'}
+              onClick={() => handleTabChange('quick')}
               theme={THEME}
             />
 
@@ -682,6 +781,14 @@ export default function App() {
                 <Sparkles className="text-white w-7 h-7" />
               </button>
             </div>
+
+            <NavItem
+              icon={CalendarDays}
+              label={t('navCalendar')}
+              active={activeTab === 'calendar'}
+              onClick={() => handleTabChange('calendar')}
+              theme={THEME}
+            />
 
             <NavItem
               icon={User}

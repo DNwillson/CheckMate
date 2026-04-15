@@ -148,6 +148,7 @@ const MyProfileAndLibrary = ({
   onRefresh,
   onDeleteHistoryRecord,
   onClearHistory,
+  onReuseHistoryTrip,
   initialSegment,
   theme,
 }) => {
@@ -166,6 +167,8 @@ const MyProfileAndLibrary = ({
   const [historyBusy, setHistoryBusy] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedTripIds, setSelectedTripIds] = useState([]);
+  const [confirmDialog, setConfirmDialog] = useState(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   useEffect(() => {
     if (activeSegment !== 'friends') return undefined;
@@ -239,12 +242,38 @@ const MyProfileAndLibrary = ({
     }
   }, []);
 
-  const customScenarios = useMemo(() => scenarios.filter((s) => s.type === 'custom'), [scenarios]);
-  const presetScenarios = useMemo(() => scenarios.filter((s) => s.type !== 'custom'), [scenarios]);
+  const customScenarios = useMemo(
+    () => scenarios.filter((s) => s.type === 'custom' && !s.archived),
+    [scenarios],
+  );
   const deletableCustomScenarios = useMemo(
     () => customScenarios.filter((s) => s.access !== 'shared'),
     [customScenarios],
   );
+  const historyNameCount = useMemo(() => {
+    const map = new Map();
+    (history || []).forEach((h) => {
+      const key = String(h?.name || '').trim().toLowerCase();
+      if (!key) return;
+      map.set(key, (map.get(key) || 0) + 1);
+    });
+    return map;
+  }, [history]);
+  const frequentScenarios = useMemo(() => {
+    return (scenarios || [])
+      .filter((s) => s.access !== 'shared' && !s.archived)
+      .map((s) => {
+        const key = String(s?.name || '').trim().toLowerCase();
+        const doneCount = historyNameCount.get(key) || 0;
+        // Prioritize repeatedly completed trips, then archived ones.
+        const score = doneCount * 100 + (s.archived ? 1 : 0);
+        return { scenario: s, score };
+      })
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.scenario)
+      .slice(0, 6);
+  }, [historyNameCount, scenarios]);
 
   const segmentItems = useMemo(
     () => [
@@ -274,6 +303,32 @@ const MyProfileAndLibrary = ({
   const toggleTripSelected = useCallback((id) => {
     setSelectedTripIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }, []);
+
+  const runConfirmAction = useCallback(async () => {
+    if (!confirmDialog) return;
+    setConfirmBusy(true);
+    try {
+      if (confirmDialog.type === 'deleteTrip') {
+        await onDelete?.(confirmDialog.tripId);
+      } else if (confirmDialog.type === 'deleteSelectedTrips') {
+        await onDeleteMany?.(confirmDialog.tripIds || []);
+        setSelectedTripIds([]);
+        setSelectMode(false);
+      } else if (confirmDialog.type === 'clearHistory') {
+        setHistoryBusy(true);
+        try {
+          await onClearHistory?.();
+        } finally {
+          setHistoryBusy(false);
+        }
+      }
+      setConfirmDialog(null);
+    } catch {
+      /* keep existing cards/list */
+    } finally {
+      setConfirmBusy(false);
+    }
+  }, [confirmDialog, onDelete, onDeleteMany, onClearHistory]);
 
   return (
     <div className={`flex flex-col h-full ${theme.bg}`}>
@@ -341,16 +396,13 @@ const MyProfileAndLibrary = ({
                     disabled={selectedTripIds.length === 0}
                     onClick={() => {
                       if (selectedTripIds.length === 0) return;
-                      if (!window.confirm(`Delete ${selectedTripIds.length} selected trips?`)) return;
-                      void (async () => {
-                        try {
-                          await onDeleteMany?.(selectedTripIds);
-                          setSelectedTripIds([]);
-                          setSelectMode(false);
-                        } catch {
-                          /* keep existing cards */
-                        }
-                      })();
+                      setConfirmDialog({
+                        type: 'deleteSelectedTrips',
+                        title: 'Delete selected trips?',
+                        message: `Delete ${selectedTripIds.length} selected trips? This action cannot be undone.`,
+                        confirmLabel: 'Delete',
+                        tripIds: selectedTripIds,
+                      });
                     }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
                       selectedTripIds.length === 0
@@ -369,7 +421,15 @@ const MyProfileAndLibrary = ({
                       key={s.access === 'shared' ? `sh-${s.owner_user_id}-${s.id}` : s.id}
                       scenario={s}
                       onSelect={onSelect}
-                      onDelete={onDelete}
+                      onDelete={(scenarioId) => {
+                        setConfirmDialog({
+                          type: 'deleteTrip',
+                          title: 'Delete this trip?',
+                          message: 'This action cannot be undone.',
+                          confirmLabel: 'Delete',
+                          tripId: scenarioId,
+                        });
+                      }}
                       isCustom
                       theme={theme}
                       selectionMode={selectMode}
@@ -399,17 +459,26 @@ const MyProfileAndLibrary = ({
               )}
             </div>
             <div>
-              <h3 className={`text-xs font-bold ${theme.textSub} uppercase tracking-wider mb-3`}>Presets</h3>
-              <div className="space-y-2.5">
-                {presetScenarios.map((s) => (
-                  <LibraryItem
-                    key={s.access === 'shared' ? `sh-${s.owner_user_id}-${s.id}` : s.id}
-                    scenario={s}
-                    onSelect={onSelect}
-                    theme={theme}
-                  />
-                ))}
-              </div>
+              <h3 className={`text-xs font-bold ${theme.textSub} uppercase tracking-wider mb-3`}>Frequently used</h3>
+              {frequentScenarios.length > 0 ? (
+                <div className="space-y-2.5">
+                  {frequentScenarios.map((s) => (
+                    <LibraryItem
+                      key={s.access === 'shared' ? `sh-${s.owner_user_id}-${s.id}` : s.id}
+                      scenario={s}
+                      onSelect={onSelect}
+                      theme={theme}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className={`text-center py-8 px-4 rounded-2xl ${theme.cardBg} border ${panelClass}`}>
+                  <p className={`text-sm font-medium ${theme.textMain}`}>No frequent trips yet</p>
+                  <p className={`text-xs ${theme.textSub} mt-1`}>
+                    Finish packing a few trips and your frequently used scenarios will appear here.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         ) : activeSegment === 'history' ? (
@@ -420,20 +489,12 @@ const MyProfileAndLibrary = ({
                   type="button"
                   disabled={historyBusy}
                   onClick={() => {
-                    if (
-                      !window.confirm(
-                        'Delete all packing history on this account? This cannot be undone.',
-                      )
-                    )
-                      return;
-                    void (async () => {
-                      setHistoryBusy(true);
-                      try {
-                        await onClearHistory?.();
-                      } finally {
-                        setHistoryBusy(false);
-                      }
-                    })();
+                    setConfirmDialog({
+                      type: 'clearHistory',
+                      title: 'Clear all history?',
+                      message: 'Delete all packing history on this account? This action cannot be undone.',
+                      confirmLabel: 'Clear all',
+                    });
                   }}
                   className={`text-[11px] font-bold px-3 py-1.5 rounded-xl ${
                     theme.isDark ? 'bg-rose-950/50 text-rose-200' : 'bg-[#FADCDC] text-[#B85C5C]'
@@ -476,6 +537,27 @@ const MyProfileAndLibrary = ({
                     >
                       Done
                     </span>
+                    {record.scenario_id ? (
+                      <button
+                        type="button"
+                        disabled={historyBusy}
+                        onClick={() => {
+                          void (async () => {
+                            setHistoryBusy(true);
+                            try {
+                              await onReuseHistoryTrip?.(record.scenario_id);
+                            } finally {
+                              setHistoryBusy(false);
+                            }
+                          })();
+                        }}
+                        className={`text-[11px] font-bold px-2.5 py-1 rounded-lg ${
+                          theme.isDark ? 'bg-sky-900/40 text-sky-200' : 'bg-sky-100 text-sky-700'
+                        } disabled:opacity-50`}
+                      >
+                        Reuse
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       aria-label="Delete history entry"
@@ -775,6 +857,39 @@ const MyProfileAndLibrary = ({
                 className="flex-1 py-3 rounded-xl font-bold text-sm text-white bg-[#D98282] hover:opacity-95 disabled:opacity-50"
               >
                 Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmDialog ? (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 p-6">
+          <div
+            className={`${theme.cardBg} w-full max-w-sm rounded-3xl p-6 shadow-2xl border ${
+              theme.isDark ? 'border-slate-600' : 'border-gray-100'
+            }`}
+          >
+            <h3 className={`text-lg font-bold ${theme.textMain} mb-2`}>{confirmDialog.title}</h3>
+            <p className={`text-sm ${theme.textSub} mb-6`}>{confirmDialog.message}</p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                disabled={confirmBusy}
+                onClick={() => setConfirmDialog(null)}
+                className={`flex-1 py-3 rounded-xl font-bold text-sm ${
+                  theme.isDark ? 'bg-slate-800 text-slate-200' : 'bg-gray-100 text-gray-600'
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={confirmBusy}
+                onClick={() => void runConfirmAction()}
+                className="flex-1 py-3 rounded-xl font-bold text-sm text-white bg-[#D98282] hover:opacity-95 disabled:opacity-50"
+              >
+                {confirmBusy ? 'Please wait…' : confirmDialog.confirmLabel || 'Confirm'}
               </button>
             </div>
           </div>

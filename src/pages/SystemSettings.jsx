@@ -47,6 +47,30 @@ function ToggleRow({ icon: Icon, label, on, disabled, onToggle, theme }) {
   );
 }
 
+function NavigationRow({ icon: Icon, label, description, onClick, theme, rightLabel }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center justify-between p-5 border-b border-[#F9F9F9] last:border-0 text-left transition-colors active:bg-black/5 ${
+        theme.isDark ? 'border-slate-700/80' : ''
+      }`}
+    >
+      <div className="flex items-center space-x-3 min-w-0">
+        <Icon size={20} className={theme.isDark ? 'text-slate-400' : 'text-[#9A9A9A]'} />
+        <div className="min-w-0">
+          <p className={`font-medium ${theme.textMain} truncate`}>{label}</p>
+          {description ? <p className={`text-xs ${theme.textSub} truncate mt-0.5`}>{description}</p> : null}
+        </div>
+      </div>
+      <div className="flex items-center shrink-0">
+        {rightLabel ? <span className={`text-xs mr-2 ${theme.textSub}`}>{rightLabel}</span> : null}
+        <ChevronRight size={18} className={theme.isDark ? 'text-slate-500' : 'text-[#D1D1D1]'} />
+      </div>
+    </button>
+  );
+}
+
 const SystemSettings = ({
   onBack,
   onLogout,
@@ -75,6 +99,7 @@ const SystemSettings = ({
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [healthOk, setHealthOk] = useState(null);
+  const [activeSection, setActiveSection] = useState('main');
 
   const cardClass = `rounded-3xl shadow-sm ${
     theme.isDark ? 'border border-slate-700/80' : 'border border-[#F5F5F5]'
@@ -166,6 +191,21 @@ const SystemSettings = ({
     </h4>
   );
 
+  const sectionTitleText = (() => {
+    if (activeSection === 'general') return t('general');
+    if (activeSection === 'personalization') return t('personalization');
+    if (activeSection === 'security') return t('accountSecurity');
+    return t('title');
+  })();
+
+  const handleHeaderBack = () => {
+    if (activeSection !== 'main') {
+      setActiveSection('main');
+      return;
+    }
+    onBack();
+  };
+
   return (
     <div className={`flex flex-col h-full relative ${theme.bg}`}>
       <div
@@ -175,13 +215,13 @@ const SystemSettings = ({
       >
         <button
           type="button"
-          onClick={onBack}
+          onClick={handleHeaderBack}
           className={`mr-4 p-2 -ml-2 rounded-full hover:bg-black/5 transition-colors ${theme.textMain}`}
         >
           <ChevronLeft size={24} />
         </button>
         <div className="flex items-center gap-2 min-w-0">
-          <h1 className={`text-xl font-bold ${theme.textMain} truncate`}>{t('title')}</h1>
+          <h1 className={`text-xl font-bold ${theme.textMain} truncate`}>{sectionTitleText}</h1>
           {prefsBusy ? (
             <span className={`text-[10px] font-medium shrink-0 ${theme.textSub}`}>{t('loadingPrefs')}</span>
           ) : null}
@@ -209,250 +249,288 @@ const SystemSettings = ({
           </button>
         </div>
 
-        <div>
-          {sectionTitle(t('general'))}
-          <div className={`${theme.cardBg} overflow-hidden ${cardClass}`}>
-            <ToggleRow
-              icon={Bell}
-              label={t('notifications')}
-              on={!!appPrefs?.notifications}
-              disabled={prefsBusy}
-              onToggle={handleNotifications}
-              theme={theme}
-            />
-            <ToggleRow
-              icon={Volume2}
-              label={t('sounds')}
-              on={!!appPrefs?.sounds}
-              disabled={prefsBusy}
-              onToggle={(next) => void runPref(() => onAppPrefsChange({ sounds: next }))}
-              theme={theme}
-            />
-            <ToggleRow
-              icon={MapPin}
-              label={t('autoLocation')}
-              on={!!appPrefs?.auto_location}
-              disabled={prefsBusy}
-              onToggle={(next) => void runPref(() => onAppPrefsChange({ auto_location: next }))}
-              theme={theme}
-            />
-            <button
-              type="button"
-              onClick={() => setLangOpen(true)}
-              className={`flex w-full items-center justify-between p-5 text-left transition-colors active:bg-black/5 ${
-                theme.textMain
-              }`}
-            >
-              <div className="flex items-center space-x-3">
-                <Globe size={20} className={theme.isDark ? 'text-slate-400' : 'text-[#9A9A9A]'} />
-                <span className="font-medium">{t('language')}</span>
-              </div>
-              <div className="flex items-center">
-                <span className="text-xs text-[#9A9A9A] mr-2">
-                  {appPrefs?.language === 'zh' ? t('langChinese') : t('langEnglish')}
-                </span>
-                <ChevronRight size={18} className="text-[#D1D1D1]" />
-              </div>
-            </button>
+        {activeSection === 'main' ? (
+          <div>
+            {sectionTitle(t('accountCenter'))}
+            <div className={`${theme.cardBg} overflow-hidden ${cardClass}`}>
+              <NavigationRow
+                icon={Bell}
+                label={t('general')}
+                description={t('generalHint')}
+                onClick={() => setActiveSection('general')}
+                theme={theme}
+                rightLabel={t('openSection')}
+              />
+              <NavigationRow
+                icon={Palette}
+                label={t('personalization')}
+                description={t('personalizationHint')}
+                onClick={() => setActiveSection('personalization')}
+                theme={theme}
+                rightLabel={t('openSection')}
+              />
+              <NavigationRow
+                icon={Lock}
+                label={t('accountSecurity')}
+                description={t('accountSecurityHint')}
+                onClick={() => setActiveSection('security')}
+                theme={theme}
+                rightLabel={t('openSection')}
+              />
+            </div>
           </div>
-        </div>
+        ) : null}
 
-        <div>
-          {sectionTitle(t('personalization'))}
-          <div className={`${theme.cardBg} overflow-hidden ${cardClass}`}>
-            <ToggleRow
-              icon={Moon}
-              label={t('darkMode')}
-              on={!!appPrefs?.dark_mode}
-              disabled={prefsBusy}
-              onToggle={(next) => void runPref(() => onAppPrefsChange({ dark_mode: next }))}
-              theme={theme}
-            />
-            <div
-              className={`p-5 flex items-center justify-between border-b border-[#F9F9F9] last:border-0 ${
-                theme.isDark ? 'border-slate-700/80' : ''
-              }`}
-            >
-              <div className={`flex items-center space-x-3 ${theme.textMain}`}>
-                <Palette size={20} className={theme.isDark ? 'text-slate-400' : 'text-[#9A9A9A]'} />
-                <span className="font-medium">{t('themeColor')}</span>
-              </div>
-              <div className="flex space-x-3">
-                {Object.keys(THEMES).map((themeKey) => {
-                  const th = THEMES[themeKey];
-                  const isActive = currentThemeKey === themeKey;
-                  return (
-                    <button
-                      key={themeKey}
-                      type="button"
-                      onClick={() => onChangeTheme(themeKey)}
-                      className={`w-6 h-6 rounded-full ${th.primary} border-2 transition-all ${
-                        isActive
-                          ? `${theme.isDark ? 'border-slate-300' : 'border-[#EAEAEA]'} ring-2 ring-offset-2 ${th.primaryBorder}`
-                          : theme.isDark
-                            ? 'border-slate-700'
-                            : 'border-white'
-                      }`}
-                      title={th.name}
-                    />
-                  );
-                })}
+        {activeSection === 'general' ? (
+          <div>
+            {sectionTitle(t('general'))}
+            <div className={`${theme.cardBg} overflow-hidden ${cardClass}`}>
+              <ToggleRow
+                icon={Bell}
+                label={t('notifications')}
+                on={!!appPrefs?.notifications}
+                disabled={prefsBusy}
+                onToggle={handleNotifications}
+                theme={theme}
+              />
+              <ToggleRow
+                icon={Volume2}
+                label={t('sounds')}
+                on={!!appPrefs?.sounds}
+                disabled={prefsBusy}
+                onToggle={(next) => void runPref(() => onAppPrefsChange({ sounds: next }))}
+                theme={theme}
+              />
+              <ToggleRow
+                icon={MapPin}
+                label={t('autoLocation')}
+                on={!!appPrefs?.auto_location}
+                disabled={prefsBusy}
+                onToggle={(next) => void runPref(() => onAppPrefsChange({ auto_location: next }))}
+                theme={theme}
+              />
+              <button
+                type="button"
+                onClick={() => setLangOpen(true)}
+                className={`flex w-full items-center justify-between p-5 text-left transition-colors active:bg-black/5 ${
+                  theme.textMain
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <Globe size={20} className={theme.isDark ? 'text-slate-400' : 'text-[#9A9A9A]'} />
+                  <span className="font-medium">{t('language')}</span>
+                </div>
+                <div className="flex items-center">
+                  <span className="text-xs text-[#9A9A9A] mr-2">
+                    {appPrefs?.language === 'zh' ? t('langChinese') : t('langEnglish')}
+                  </span>
+                  <ChevronRight size={18} className="text-[#D1D1D1]" />
+                </div>
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {activeSection === 'personalization' ? (
+          <div>
+            {sectionTitle(t('personalization'))}
+            <div className={`${theme.cardBg} overflow-hidden ${cardClass}`}>
+              <ToggleRow
+                icon={Moon}
+                label={t('darkMode')}
+                on={!!appPrefs?.dark_mode}
+                disabled={prefsBusy}
+                onToggle={(next) => void runPref(() => onAppPrefsChange({ dark_mode: next }))}
+                theme={theme}
+              />
+              <div
+                className={`p-5 flex items-center justify-between border-b border-[#F9F9F9] last:border-0 ${
+                  theme.isDark ? 'border-slate-700/80' : ''
+                }`}
+              >
+                <div className={`flex items-center space-x-3 ${theme.textMain}`}>
+                  <Palette size={20} className={theme.isDark ? 'text-slate-400' : 'text-[#9A9A9A]'} />
+                  <span className="font-medium">{t('themeColor')}</span>
+                </div>
+                <div className="flex space-x-3">
+                  {Object.keys(THEMES).map((themeKey) => {
+                    const th = THEMES[themeKey];
+                    const isActive = currentThemeKey === themeKey;
+                    return (
+                      <button
+                        key={themeKey}
+                        type="button"
+                        onClick={() => onChangeTheme(themeKey)}
+                        className={`w-6 h-6 rounded-full ${th.primary} border-2 transition-all ${
+                          isActive
+                            ? `${theme.isDark ? 'border-slate-300' : 'border-[#EAEAEA]'} ring-2 ring-offset-2 ${th.primaryBorder}`
+                            : theme.isDark
+                              ? 'border-slate-700'
+                              : 'border-white'
+                        }`}
+                        title={th.name}
+                      />
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        ) : null}
 
-        <div>
-          {sectionTitle(t('accountSecurity'))}
-          <div className={`${theme.cardBg} overflow-hidden ${cardClass}`}>
-            <div
-              className={`p-5 space-y-3 border-b border-[#F9F9F9] ${
-                theme.isDark ? 'border-slate-700/80' : ''
-              }`}
-            >
-              <div className={`flex items-center gap-2 ${theme.textMain}`}>
-                <Lock size={18} className={theme.isDark ? 'text-slate-400' : 'text-[#9A9A9A]'} />
-                <span className="font-medium">{t('changePassword')}</span>
-              </div>
-              <input
-                type="password"
-                autoComplete="current-password"
-                value={pwdCurrent}
-                onChange={(e) => {
-                  setPwdCurrent(e.target.value);
-                  setPwdMsg('');
-                }}
-                placeholder={t('currentPassword')}
-                className={`w-full px-3 py-2.5 rounded-xl text-sm outline-none border ${
-                  theme.isDark
-                    ? 'bg-slate-900 border-slate-600 text-slate-100'
-                    : 'border-gray-200 bg-white'
+        {activeSection === 'security' ? (
+          <div>
+            {sectionTitle(t('accountSecurity'))}
+            <div className={`${theme.cardBg} overflow-hidden ${cardClass}`}>
+              <div
+                className={`p-5 space-y-3 border-b border-[#F9F9F9] ${
+                  theme.isDark ? 'border-slate-700/80' : ''
                 }`}
-              />
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={pwdNew}
-                onChange={(e) => {
-                  setPwdNew(e.target.value);
-                  setPwdMsg('');
-                }}
-                placeholder={t('newPassword')}
-                className={`w-full px-3 py-2.5 rounded-xl text-sm outline-none border ${
-                  theme.isDark
-                    ? 'bg-slate-900 border-slate-600 text-slate-100'
-                    : 'border-gray-200 bg-white'
-                }`}
-              />
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={pwdConfirm}
-                onChange={(e) => {
-                  setPwdConfirm(e.target.value);
-                  setPwdMsg('');
-                }}
-                placeholder={t('confirmPassword')}
-                className={`w-full px-3 py-2.5 rounded-xl text-sm outline-none border ${
-                  theme.isDark
-                    ? 'bg-slate-900 border-slate-600 text-slate-100'
-                    : 'border-gray-200 bg-white'
-                }`}
-              />
-              {pwdMsg ? (
-                <p className={`text-xs font-medium ${theme.isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>
-                  {pwdMsg}
-                </p>
-              ) : null}
-              <button
-                type="button"
-                disabled={pwdBusy || !onChangePassword}
-                onClick={() => {
-                  void (async () => {
-                    if (!onChangePassword) return;
-                    if (pwdNew !== pwdConfirm) {
-                      window.alert(t('passwordMismatch'));
-                      return;
-                    }
-                    setPwdBusy(true);
+              >
+                <div className={`flex items-center gap-2 ${theme.textMain}`}>
+                  <Lock size={18} className={theme.isDark ? 'text-slate-400' : 'text-[#9A9A9A]'} />
+                  <span className="font-medium">{t('changePassword')}</span>
+                </div>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={pwdCurrent}
+                  onChange={(e) => {
+                    setPwdCurrent(e.target.value);
                     setPwdMsg('');
-                    try {
-                      await onChangePassword({
-                        currentPassword: pwdCurrent,
-                        newPassword: pwdNew,
-                      });
-                      setPwdCurrent('');
-                      setPwdNew('');
-                      setPwdConfirm('');
-                      setPwdMsg(t('passwordUpdated'));
-                    } catch {
-                      window.alert(t('passwordSaveError'));
-                    } finally {
-                      setPwdBusy(false);
-                    }
-                  })();
-                }}
-                className={`w-full py-3 rounded-xl text-sm font-bold text-white ${theme.primary} disabled:opacity-50`}
-              >
-                {t('updatePassword')}
-              </button>
-            </div>
-            <div className={`p-5 space-y-3 ${theme.isDark ? 'bg-rose-950/15' : 'bg-[#FFF8F8]'}`}>
-              <div className={`flex items-center gap-2 ${theme.textMain}`}>
-                <Trash2 size={18} className="text-rose-500" />
-                <span className="font-medium">{t('dangerous')}</span>
+                  }}
+                  placeholder={t('currentPassword')}
+                  className={`w-full px-3 py-2.5 rounded-xl text-sm outline-none border ${
+                    theme.isDark
+                      ? 'bg-slate-900 border-slate-600 text-slate-100'
+                      : 'border-gray-200 bg-white'
+                  }`}
+                />
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={pwdNew}
+                  onChange={(e) => {
+                    setPwdNew(e.target.value);
+                    setPwdMsg('');
+                  }}
+                  placeholder={t('newPassword')}
+                  className={`w-full px-3 py-2.5 rounded-xl text-sm outline-none border ${
+                    theme.isDark
+                      ? 'bg-slate-900 border-slate-600 text-slate-100'
+                      : 'border-gray-200 bg-white'
+                  }`}
+                />
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  value={pwdConfirm}
+                  onChange={(e) => {
+                    setPwdConfirm(e.target.value);
+                    setPwdMsg('');
+                  }}
+                  placeholder={t('confirmPassword')}
+                  className={`w-full px-3 py-2.5 rounded-xl text-sm outline-none border ${
+                    theme.isDark
+                      ? 'bg-slate-900 border-slate-600 text-slate-100'
+                      : 'border-gray-200 bg-white'
+                  }`}
+                />
+                {pwdMsg ? (
+                  <p className={`text-xs font-medium ${theme.isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                    {pwdMsg}
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={pwdBusy || !onChangePassword}
+                  onClick={() => {
+                    void (async () => {
+                      if (!onChangePassword) return;
+                      if (pwdNew !== pwdConfirm) {
+                        window.alert(t('passwordMismatch'));
+                        return;
+                      }
+                      setPwdBusy(true);
+                      setPwdMsg('');
+                      try {
+                        await onChangePassword({
+                          currentPassword: pwdCurrent,
+                          newPassword: pwdNew,
+                        });
+                        setPwdCurrent('');
+                        setPwdNew('');
+                        setPwdConfirm('');
+                        setPwdMsg(t('passwordUpdated'));
+                      } catch {
+                        window.alert(t('passwordSaveError'));
+                      } finally {
+                        setPwdBusy(false);
+                      }
+                    })();
+                  }}
+                  className={`w-full py-3 rounded-xl text-sm font-bold text-white ${theme.primary} disabled:opacity-50`}
+                >
+                  {t('updatePassword')}
+                </button>
               </div>
-              <p className={`text-xs ${theme.textSub}`}>{t('deleteAccountHint')}</p>
-              <label className={`text-[11px] font-bold uppercase ${theme.textSub}`}>
-                {t('deleteConfirmLabel')}
-              </label>
-              <input
-                type="text"
-                value={deleteConfirm}
-                onChange={(e) => setDeleteConfirm(e.target.value.toLowerCase())}
-                placeholder={t('deleteConfirmPlaceholder')}
-                autoComplete="username"
-                className={`w-full px-3 py-2.5 rounded-xl text-sm outline-none border ${
-                  theme.isDark
-                    ? 'bg-slate-900 border-slate-600 text-slate-100'
-                    : 'border-gray-200 bg-white'
-                }`}
-              />
-              <button
-                type="button"
-                disabled={deleteBusy || !onDeleteAccount}
-                onClick={() => {
-                  void (async () => {
-                    if (!onDeleteAccount) return;
-                    const u = (currentUser?.username || '').toLowerCase();
-                    if (deleteConfirm.trim().toLowerCase() !== u) {
-                      window.alert(t('deleteMismatch'));
-                      return;
-                    }
-                    if (
-                      !window.confirm(
-                        appPrefs?.language === 'zh'
-                          ? '确定永久删除账号？此操作无法撤销。'
-                          : 'Permanently delete your account? This cannot be undone.',
+              <div className={`p-5 space-y-3 ${theme.isDark ? 'bg-rose-950/15' : 'bg-[#FFF8F8]'}`}>
+                <div className={`flex items-center gap-2 ${theme.textMain}`}>
+                  <Trash2 size={18} className="text-rose-500" />
+                  <span className="font-medium">{t('dangerous')}</span>
+                </div>
+                <p className={`text-xs ${theme.textSub}`}>{t('deleteAccountHint')}</p>
+                <label className={`text-[11px] font-bold uppercase ${theme.textSub}`}>
+                  {t('deleteConfirmLabel')}
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirm}
+                  onChange={(e) => setDeleteConfirm(e.target.value.toLowerCase())}
+                  placeholder={t('deleteConfirmPlaceholder')}
+                  autoComplete="username"
+                  className={`w-full px-3 py-2.5 rounded-xl text-sm outline-none border ${
+                    theme.isDark
+                      ? 'bg-slate-900 border-slate-600 text-slate-100'
+                      : 'border-gray-200 bg-white'
+                  }`}
+                />
+                <button
+                  type="button"
+                  disabled={deleteBusy || !onDeleteAccount}
+                  onClick={() => {
+                    void (async () => {
+                      if (!onDeleteAccount) return;
+                      const u = (currentUser?.username || '').toLowerCase();
+                      if (deleteConfirm.trim().toLowerCase() !== u) {
+                        window.alert(t('deleteMismatch'));
+                        return;
+                      }
+                      if (
+                        !window.confirm(
+                          appPrefs?.language === 'zh'
+                            ? '确定永久删除账号？此操作无法撤销。'
+                            : 'Permanently delete your account? This cannot be undone.',
+                        )
                       )
-                    )
-                      return;
-                    setDeleteBusy(true);
-                    try {
-                      await onDeleteAccount();
-                    } catch {
-                      window.alert('Could not delete account.');
-                      setDeleteBusy(false);
-                    }
-                  })();
-                }}
-                className="w-full py-3 rounded-xl text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50"
-              >
-                {t('deleteAccountButton')}
-              </button>
+                        return;
+                      setDeleteBusy(true);
+                      try {
+                        await onDeleteAccount();
+                      } catch {
+                        window.alert('Could not delete account.');
+                        setDeleteBusy(false);
+                      }
+                    })();
+                  }}
+                  className="w-full py-3 rounded-xl text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50"
+                >
+                  {t('deleteAccountButton')}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        ) : null}
 
         <div className={`${theme.cardBg} p-4 ${cardClass} flex items-center justify-between`}>
           <div className={`flex items-center gap-2 ${theme.textMain}`}>

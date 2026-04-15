@@ -69,8 +69,10 @@ const HomeDashboard = ({
   const hint =
     weather?.packingHint || (weatherLoading ? 'Fetching live forecast…' : 'Tap refresh to load weather.');
   const tempUnit = weather?.tempUnit || 'C';
-  const myTrips = useMemo(() => scenarios.filter((s) => s.type === 'custom' && s.access !== 'shared'), [scenarios]);
-  const quickScenarios = useMemo(() => scenarios.filter((s) => s.type !== 'custom'), [scenarios]);
+  const myTrips = useMemo(
+    () => scenarios.filter((s) => s.type === 'custom' && s.access !== 'shared' && !s.archived),
+    [scenarios],
+  );
   const weatherPackingItems = useMemo(() => {
     const out = [];
     const push = (text, critical = false) => {
@@ -321,92 +323,71 @@ const HomeDashboard = ({
           <h2 className={`text-lg font-bold ${theme.textMain}`}>{t?.('myTrips') || 'My Trips'}</h2>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          {(myTrips.length ? myTrips : quickScenarios).slice(0, 4).map((scenario) => {
-            const Icon = IconMap[scenario.icon] || IconMap.Briefcase;
-            const cardTheme = scenario.theme || { bg: 'bg-white', text: 'text-gray-500' };
-            const listKey =
-              scenario.access === 'shared'
-                ? `shared-${scenario.owner_user_id}-${scenario.id}`
-                : scenario.id;
-            return (
-              <button
-                key={listKey}
-                type="button"
-                onClick={() => onSelect(scenario.id, scenario.owner_user_id ?? null)}
-                className="group relative bg-white rounded-[24px] p-5 h-40 flex flex-col justify-between items-start shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.05)] transition-all active:scale-98 text-left border border-transparent hover:border-[#F0F0F0]"
-              >
-                <div
-                  className={`w-12 h-12 rounded-2xl ${cardTheme.bg} ${cardTheme.text} flex items-center justify-center transition-colors`}
+        {myTrips.length ? (
+          <div className="grid grid-cols-2 gap-4">
+            {myTrips.slice(0, 4).map((scenario) => {
+              const Icon = IconMap[scenario.icon] || IconMap.Briefcase;
+              const cardTheme = scenario.theme || { bg: 'bg-white', text: 'text-gray-500' };
+              const listKey =
+                scenario.access === 'shared'
+                  ? `shared-${scenario.owner_user_id}-${scenario.id}`
+                  : scenario.id;
+              return (
+                <button
+                  key={listKey}
+                  type="button"
+                  onClick={() => onSelect(scenario.id, scenario.owner_user_id ?? null)}
+                  className="group relative bg-white rounded-[24px] p-5 h-40 flex flex-col justify-between items-start shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.05)] transition-all active:scale-98 text-left border border-transparent hover:border-[#F0F0F0]"
                 >
-                  <Icon size={24} strokeWidth={1.5} />
-                </div>
-                <div>
-                  {scenario.access === 'shared' ? (
-                    <p className="text-[10px] font-bold text-sky-600 uppercase tracking-wide mb-0.5">
-                      {(t?.('fromUser') || 'From')} @{scenario.owner_username}
-                    </p>
-                  ) : null}
-                  <h3 className={`font-bold ${theme.textMain} text-lg`}>{scenario.name}</h3>
-                  <p className={`text-xs ${theme.textSub} mt-1 font-medium`}>{scenario.items.length} items</p>
-                </div>
-
-                <div className="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-0 translate-x-2">
-                  <div className="bg-[#F5F5F5] rounded-full p-1.5">
-                    <ChevronRight size={14} className="text-[#9A9A9A]" />
+                  <div
+                    className={`w-12 h-12 rounded-2xl ${cardTheme.bg} ${cardTheme.text} flex items-center justify-center transition-colors`}
+                  >
+                    <Icon size={24} strokeWidth={1.5} />
                   </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+                  <div>
+                    {scenario.access === 'shared' ? (
+                      <p className="text-[10px] font-bold text-sky-600 uppercase tracking-wide mb-0.5">
+                        {(t?.('fromUser') || 'From')} @{scenario.owner_username}
+                      </p>
+                    ) : null}
+                    {scenario.trip_start_at ? (
+                      <p
+                        className={`text-[10px] font-bold uppercase tracking-wide mb-0.5 ${
+                          theme.isDark ? 'text-emerald-300' : 'text-emerald-600'
+                        }`}
+                      >
+                        {t?.('tripScheduledTag') || 'Scheduled'}
+                      </p>
+                    ) : null}
+                    <h3 className={`font-bold ${theme.textMain} text-lg`}>{scenario.name}</h3>
+                    <p className={`text-xs ${theme.textSub} mt-1 font-medium`}>{scenario.items.length} items</p>
+                  </div>
+
+                  <div className="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-0 translate-x-2">
+                    <div className="bg-[#F5F5F5] rounded-full p-1.5">
+                      <ChevronRight size={14} className="text-[#9A9A9A]" />
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div
+            className={`rounded-2xl border px-4 py-6 text-center ${
+              theme.isDark ? 'border-slate-700/70 bg-slate-900/40' : 'border-[#EFEFEF] bg-white'
+            }`}
+          >
+            <p className={`text-sm font-semibold ${theme.textMain}`}>
+              {t?.('myTripsEmptyTitle') || 'No trips created yet'}
+            </p>
+            <p className={`text-xs mt-1 ${theme.textSub}`}>
+              {t?.('myTripsEmptyDesc') || 'Create your first trip to see it here.'}
+            </p>
+          </div>
+        )}
       </div>
 
-      <div>
-        <div className="flex justify-between items-end mb-4">
-          <h2 className={`text-lg font-bold ${theme.textMain}`}>{t?.('quickScenarios') || 'Quick Scenarios'}</h2>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          {quickScenarios.slice(0, 4).map((scenario) => {
-            const Icon = IconMap[scenario.icon] || IconMap.Briefcase;
-            const cardTheme = scenario.theme || { bg: 'bg-white', text: 'text-gray-500' };
-            const listKey =
-              scenario.access === 'shared'
-                ? `shared-${scenario.owner_user_id}-${scenario.id}`
-                : scenario.id;
-            return (
-              <button
-                key={listKey}
-                type="button"
-                onClick={() => onSelect(scenario.id, scenario.owner_user_id ?? null)}
-                className="group relative bg-white rounded-[24px] p-5 h-40 flex flex-col justify-between items-start shadow-[0_4px_20px_rgba(0,0,0,0.03)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.05)] transition-all active:scale-98 text-left border border-transparent hover:border-[#F0F0F0]"
-              >
-                <div
-                  className={`w-12 h-12 rounded-2xl ${cardTheme.bg} ${cardTheme.text} flex items-center justify-center transition-colors`}
-                >
-                  <Icon size={24} strokeWidth={1.5} />
-                </div>
-                <div>
-                  {scenario.access === 'shared' ? (
-                    <p className="text-[10px] font-bold text-sky-600 uppercase tracking-wide mb-0.5">
-                      {(t?.('fromUser') || 'From')} @{scenario.owner_username}
-                    </p>
-                  ) : null}
-                  <h3 className={`font-bold ${theme.textMain} text-lg`}>{scenario.name}</h3>
-                  <p className={`text-xs ${theme.textSub} mt-1 font-medium`}>{scenario.items.length} items</p>
-                </div>
-
-                <div className="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-0 translate-x-2">
-                  <div className="bg-[#F5F5F5] rounded-full p-1.5">
-                    <ChevronRight size={14} className="text-[#9A9A9A]" />
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 };

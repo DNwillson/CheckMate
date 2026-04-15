@@ -1,11 +1,34 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, AlertCircle, Circle } from 'lucide-react';
 
-const CreateNewTrip = ({ onBack, onSave, theme }) => {
+const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = 'en' }) => {
   const [name, setName] = useState('');
+  const [tripStartAt, setTripStartAt] = useState('');
+  const [tripEndAt, setTripEndAt] = useState('');
   const [items, setItems] = useState([]);
   const [criticalInput, setCriticalInput] = useState('');
   const [optionalInput, setOptionalInput] = useState('');
+  const inputLocale = language === 'zh' ? 'zh-CN' : 'en-US';
+
+  useEffect(() => {
+    if (!initialTrip) {
+      setName('');
+      setTripStartAt('');
+      setTripEndAt('');
+      setItems([]);
+      return;
+    }
+    setName(String(initialTrip.name || '').trim());
+    setTripStartAt(initialTrip.trip_start_at ? String(initialTrip.trip_start_at).slice(0, 16) : '');
+    setTripEndAt(initialTrip.trip_end_at ? String(initialTrip.trip_end_at).slice(0, 16) : '');
+    const seededItems = (Array.isArray(initialTrip.items) ? initialTrip.items : []).map((it, idx) => ({
+      id: it?.id || `draft_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 7)}`,
+      text: String(it?.text || '').trim(),
+      critical: !!it?.critical,
+      assignedTo: 'me',
+    })).filter((it) => it.text);
+    setItems(seededItems);
+  }, [initialTrip]);
 
   const addItem = (text, critical) => {
     const v = String(text || '').trim();
@@ -25,12 +48,18 @@ const CreateNewTrip = ({ onBack, onSave, theme }) => {
 
   const handleSave = async () => {
     if (!name || items.length === 0) return;
+    if (tripStartAt && tripEndAt && new Date(tripEndAt) < new Date(tripStartAt)) {
+      window.alert('Trip end time must be after start time.');
+      return;
+    }
     const payload = {
       id: Date.now().toString(),
       name,
-      icon: 'Backpack',
-      theme: { bg: theme.primaryLight, text: theme.primaryText },
+      icon: initialTrip?.icon || 'Backpack',
+      theme: initialTrip?.theme || { bg: theme.primaryLight, text: theme.primaryText },
       items,
+      trip_start_at: tripStartAt || null,
+      trip_end_at: tripEndAt || null,
     };
     await onSave(payload);
   };
@@ -64,6 +93,31 @@ const CreateNewTrip = ({ onBack, onSave, theme }) => {
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
+        </div>
+        <div>
+          <label className={`block text-xs font-bold ${theme.textSub} mb-3 ml-1`}>Trip date & time</label>
+          <div className="grid grid-cols-1 gap-3">
+            <div>
+              <p className={`text-[11px] ${theme.textSub} mb-1.5`}>Start</p>
+              <input
+                type="datetime-local"
+                lang={inputLocale}
+                className={`w-full py-3 px-4 ${theme.cardBg} rounded-2xl shadow-sm border-2 border-transparent outline-none ${theme.textMain}`}
+                value={tripStartAt}
+                onChange={(e) => setTripStartAt(e.target.value)}
+              />
+            </div>
+            <div>
+              <p className={`text-[11px] ${theme.textSub} mb-1.5`}>End (optional)</p>
+              <input
+                type="datetime-local"
+                lang={inputLocale}
+                className={`w-full py-3 px-4 ${theme.cardBg} rounded-2xl shadow-sm border-2 border-transparent outline-none ${theme.textMain}`}
+                value={tripEndAt}
+                onChange={(e) => setTripEndAt(e.target.value)}
+              />
+            </div>
+          </div>
         </div>
         <div>
           <label className={`block text-xs font-bold ${theme.textSub} mb-3 ml-1`}>Checklist</label>

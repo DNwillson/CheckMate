@@ -17,6 +17,23 @@ import { THEMES } from '../constants/data';
 import { settingsT } from '../settingsCopy';
 import { api } from '../api';
 
+const AVATAR_STYLE_OPTIONS = [
+  { id: 'notionists', label: 'Notionists' },
+  { id: 'avataaars', label: 'Avataaars' },
+  { id: 'bottts', label: 'Bottts' },
+  { id: 'micah', label: 'Micah' },
+  { id: 'fun-emoji', label: 'Fun Emoji' },
+  { id: 'adventurer', label: 'Adventurer' },
+  { id: 'adventurer-neutral', label: 'Adventurer Neutral' },
+  { id: 'big-ears', label: 'Big Ears' },
+  { id: 'big-smile', label: 'Big Smile' },
+  { id: 'croodles', label: 'Croodles' },
+  { id: 'identicon', label: 'Identicon' },
+  { id: 'lorelei', label: 'Lorelei' },
+  { id: 'open-peeps', label: 'Open Peeps' },
+  { id: 'thumbs', label: 'Thumbs' },
+];
+
 function ToggleRow({ icon: Icon, label, on, disabled, onToggle, theme }) {
   return (
     <button
@@ -87,6 +104,7 @@ const SystemSettings = ({
   const t = settingsT(appPrefs?.language || 'en');
   const [showEdit, setShowEdit] = useState(false);
   const [draftName, setDraftName] = useState('');
+  const [draftAvatarStyle, setDraftAvatarStyle] = useState('notionists');
   const [langOpen, setLangOpen] = useState(false);
   const [prefsBusy, setPrefsBusy] = useState(false);
   const [profileSaveBusy, setProfileSaveBusy] = useState(false);
@@ -120,6 +138,7 @@ const SystemSettings = ({
   useEffect(() => {
     if (showEdit) {
       setDraftName(currentUser?.name || currentUser?.username || '');
+      setDraftAvatarStyle(currentUser?.avatar_style || 'notionists');
       setProfileSaveErr('');
     }
   }, [showEdit, currentUser]);
@@ -145,7 +164,10 @@ const SystemSettings = ({
       setProfileSaveBusy(true);
       setProfileSaveErr('');
       try {
-        await onSaveProfileDisplayName(draftName.trim());
+        await onSaveProfileDisplayName({
+          displayName: draftName.trim(),
+          avatarStyle: draftAvatarStyle,
+        });
         setShowEdit(false);
       } catch {
         setProfileSaveErr(t('displayNameSaveError'));
@@ -400,7 +422,7 @@ const SystemSettings = ({
                     setPwdMsg('');
                   }}
                   placeholder={t('currentPassword')}
-                  className={`w-full px-3 py-2.5 rounded-xl text-sm outline-none border ${
+                  className={`input-soft w-full px-3 py-2.5 text-sm outline-none ${
                     theme.isDark
                       ? 'bg-slate-900 border-slate-600 text-slate-100'
                       : 'border-gray-200 bg-white'
@@ -415,7 +437,7 @@ const SystemSettings = ({
                     setPwdMsg('');
                   }}
                   placeholder={t('newPassword')}
-                  className={`w-full px-3 py-2.5 rounded-xl text-sm outline-none border ${
+                  className={`input-soft w-full px-3 py-2.5 text-sm outline-none ${
                     theme.isDark
                       ? 'bg-slate-900 border-slate-600 text-slate-100'
                       : 'border-gray-200 bg-white'
@@ -430,7 +452,7 @@ const SystemSettings = ({
                     setPwdMsg('');
                   }}
                   placeholder={t('confirmPassword')}
-                  className={`w-full px-3 py-2.5 rounded-xl text-sm outline-none border ${
+                  className={`input-soft w-full px-3 py-2.5 text-sm outline-none ${
                     theme.isDark
                       ? 'bg-slate-900 border-slate-600 text-slate-100'
                       : 'border-gray-200 bg-white'
@@ -469,7 +491,7 @@ const SystemSettings = ({
                       }
                     })();
                   }}
-                  className={`w-full py-3 rounded-xl text-sm font-bold text-white ${theme.primary} disabled:opacity-50`}
+                  className={`btn-primary-soft w-full py-3 rounded-xl text-sm font-bold text-white ${theme.primary} disabled:opacity-50`}
                 >
                   {t('updatePassword')}
                 </button>
@@ -489,7 +511,7 @@ const SystemSettings = ({
                   onChange={(e) => setDeleteConfirm(e.target.value.toLowerCase())}
                   placeholder={t('deleteConfirmPlaceholder')}
                   autoComplete="username"
-                  className={`w-full px-3 py-2.5 rounded-xl text-sm outline-none border ${
+                  className={`input-soft w-full px-3 py-2.5 text-sm outline-none ${
                     theme.isDark
                       ? 'bg-slate-900 border-slate-600 text-slate-100'
                       : 'border-gray-200 bg-white'
@@ -523,7 +545,7 @@ const SystemSettings = ({
                       }
                     })();
                   }}
-                  className="w-full py-3 rounded-xl text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50"
+                  className="btn-danger-soft w-full py-3 rounded-xl text-sm font-bold disabled:opacity-50"
                 >
                   {t('deleteAccountButton')}
                 </button>
@@ -586,11 +608,39 @@ const SystemSettings = ({
             </div>
             <p className={`text-xs ${theme.textSub} mb-4`}>{t('displayNameHint')}</p>
             {profileSaveErr ? <p className="text-xs text-red-500 mb-2">{profileSaveErr}</p> : null}
+            <div className="mb-3">
+              <p className={`text-xs font-semibold ${theme.textSub} mb-2`}>{t('avatarStyle')}</p>
+              <div className="flex flex-wrap gap-2">
+                {AVATAR_STYLE_OPTIONS.map((style) => {
+                  const selected = draftAvatarStyle === style.id;
+                  const preview = `https://api.dicebear.com/7.x/${style.id}/svg?seed=${encodeURIComponent(
+                    currentUser?.username || 'user',
+                  )}`;
+                  return (
+                    <button
+                      key={style.id}
+                      type="button"
+                      onClick={() => setDraftAvatarStyle(style.id)}
+                      className={`px-2 py-1.5 rounded-lg border text-[11px] font-medium flex items-center gap-2 ${
+                        selected
+                          ? `${theme.primary} text-white border-transparent`
+                          : theme.isDark
+                            ? 'border-slate-600 text-slate-200 bg-slate-800'
+                            : 'border-slate-200 text-slate-700 bg-slate-50'
+                      }`}
+                    >
+                      <img src={preview} alt={style.label} className="w-5 h-5 rounded-full bg-black/5" />
+                      <span>{style.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <input
               type="text"
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
-              className={`w-full px-4 py-3 border rounded-xl mb-4 outline-none ${
+              className={`input-soft w-full px-4 py-3 mb-4 outline-none ${
                 theme.isDark
                   ? 'bg-slate-900 border-slate-600 text-slate-100 placeholder-slate-500'
                   : 'border-gray-200 text-gray-800'
@@ -602,7 +652,7 @@ const SystemSettings = ({
               <button
                 type="button"
                 onClick={() => setShowEdit(false)}
-                className={`flex-1 py-3 rounded-xl font-bold ${
+                className={`btn-secondary-soft flex-1 py-3 rounded-xl font-bold ${
                   theme.isDark ? 'text-slate-300 bg-slate-700' : 'text-gray-500 bg-gray-100'
                 }`}
               >
@@ -612,7 +662,7 @@ const SystemSettings = ({
                 type="button"
                 disabled={profileSaveBusy}
                 onClick={handleSaveProfile}
-                className={`flex-1 py-3 rounded-xl font-bold text-white ${theme.primary} disabled:opacity-50`}
+                className={`btn-primary-soft flex-1 py-3 rounded-xl font-bold text-white ${theme.primary} disabled:opacity-50`}
               >
                 {profileSaveBusy ? t('savingProfile') : t('save')}
               </button>
@@ -648,8 +698,8 @@ const SystemSettings = ({
                     appPrefs?.language === code
                       ? `${theme.primaryLight} ${theme.primaryText}`
                       : theme.isDark
-                        ? 'bg-slate-800/80 text-slate-200'
-                        : 'bg-[#F5F5F5] text-[#5C5C5C]'
+                        ? 'btn-secondary-soft bg-slate-800/80 text-slate-200'
+                        : 'btn-secondary-soft bg-[#F5F5F5] text-[#5C5C5C]'
                   }`}
                 >
                   {label}

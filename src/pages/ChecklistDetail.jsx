@@ -409,11 +409,16 @@ const ChecklistDetail = ({
 
       {readOnly ? (
         <div
-          className={`mx-4 mt-3 px-3 py-2.5 rounded-2xl text-xs font-semibold text-center ${
+          className={`mx-4 mt-3 px-3 py-2.5 rounded-2xl text-xs font-semibold ${
             theme.isDark ? 'bg-sky-950/40 text-sky-200 border border-sky-800/50' : 'bg-sky-50 text-sky-900 border border-sky-100'
           }`}
         >
-          View only · shared by @{scenario.owner_username || 'friend'}
+          <div className="flex items-center justify-center gap-2">
+            {scenario.owner_avatar ? (
+              <img src={scenario.owner_avatar} alt="" className="w-5 h-5 rounded-full bg-white object-cover" />
+            ) : null}
+            <span>View only · shared by @{scenario.owner_username || 'friend'}</span>
+          </div>
         </div>
       ) : null}
 
@@ -427,7 +432,10 @@ const ChecklistDetail = ({
           <ul className="space-y-2">
             {scenario.share_recipients.map((r) => (
               <li key={r.username} className="flex items-center justify-between gap-2">
-                <span className="font-semibold truncate">@{r.username}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  {r.avatar ? <img src={r.avatar} alt="" className="w-6 h-6 rounded-full bg-white object-cover" /> : null}
+                  <span className="font-semibold truncate">@{r.username}</span>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -439,7 +447,7 @@ const ChecklistDetail = ({
                       }
                     })();
                   }}
-                  className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-lg ${
+                  className={`btn-ghost-soft shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-lg ${
                     theme.isDark ? 'bg-rose-950/60 text-rose-200' : 'bg-white text-rose-700 border border-rose-100'
                   }`}
                 >
@@ -597,7 +605,7 @@ const ChecklistDetail = ({
               value={shareUsername}
               onChange={(e) => setShareUsername(e.target.value.toLowerCase())}
               placeholder="e.g. alex_travels"
-              className={`mt-1 w-full px-3 py-2.5 rounded-xl border text-sm mb-2 outline-none ${
+              className={`input-soft mt-1 w-full px-3 py-2.5 text-sm mb-2 outline-none ${
                 theme.isDark ? 'bg-slate-900 border-slate-600 text-slate-100' : 'border-gray-200'
               }`}
             />
@@ -635,7 +643,7 @@ const ChecklistDetail = ({
                         key={f.id}
                         type="button"
                         onClick={() => setShareUsername((f.username || f.name || '').toLowerCase())}
-                        className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${
+                      className={`btn-secondary-soft text-xs font-semibold px-2.5 py-1 rounded-lg ${
                           theme.isDark ? 'bg-slate-800 text-slate-200' : 'bg-[#F0F0F0] text-[#555]'
                         }`}
                       >
@@ -650,7 +658,7 @@ const ChecklistDetail = ({
               <button
                 type="button"
                 onClick={() => setShowShareModal(false)}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-bold ${
+                className={`btn-secondary-soft flex-1 py-2.5 rounded-xl text-sm font-bold ${
                   theme.isDark ? 'bg-slate-800 text-slate-200' : 'bg-gray-100 text-gray-600'
                 }`}
               >
@@ -678,7 +686,7 @@ const ChecklistDetail = ({
                     }
                   })();
                 }}
-                className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white ${theme.primary} disabled:opacity-50`}
+                className={`btn-primary-soft flex-1 py-2.5 rounded-xl text-sm font-bold text-white ${theme.primary} disabled:opacity-50`}
               >
                 Share
               </button>
@@ -721,7 +729,7 @@ const ChecklistDetail = ({
                         <button
                           type="button"
                           onClick={() => handleRemoveCollaborator(friend.id)}
-                          className={`shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold ${
+                          className={`btn-ghost-soft shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold ${
                             theme.isDark
                               ? 'bg-rose-950/50 text-rose-200'
                               : 'bg-[#FADCDC] text-[#B85C5C]'
@@ -733,7 +741,7 @@ const ChecklistDetail = ({
                         <button
                           type="button"
                           onClick={() => handleAddFriend(friend.id)}
-                          className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold ${theme.accentGreen} text-[#7A9E83]`}
+                          className={`btn-secondary-soft shrink-0 px-4 py-2 rounded-xl text-xs font-bold ${theme.accentGreen} text-[#7A9E83]`}
                         >
                           Add
                         </button>
@@ -746,7 +754,7 @@ const ChecklistDetail = ({
             <button
               type="button"
               onClick={() => setShowInviteModal(false)}
-              className={`w-full mt-5 py-3.5 font-bold text-sm rounded-2xl ${
+              className={`btn-secondary-soft w-full mt-5 py-3.5 font-bold text-sm rounded-2xl ${
                 theme.isDark ? 'bg-slate-800 text-slate-300' : 'bg-[#F5F5F5] text-[#9A9A9A]'
               }`}
             >

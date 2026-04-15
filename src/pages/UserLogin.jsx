@@ -50,14 +50,14 @@ const UserLogin = ({ onAuth, theme, t }) => {
           <button
             type="button"
             onClick={() => { setMode('login'); setError(''); }}
-            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${mode === 'login' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
+            className={`segmented-tab flex-1 py-2 text-sm font-bold rounded-lg ${mode === 'login' ? 'is-active bg-white text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
           >
             {t?.('signIn') || 'Sign in'}
           </button>
           <button
             type="button"
             onClick={() => { setMode('register'); setError(''); }}
-            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${mode === 'register' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}
+            className={`segmented-tab flex-1 py-2 text-sm font-bold rounded-lg ${mode === 'register' ? 'is-active bg-white text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
           >
             {t?.('register') || 'Register'}
           </button>
@@ -112,7 +112,7 @@ const UserLogin = ({ onAuth, theme, t }) => {
           <button
             type="submit"
             disabled={busy}
-            className="w-full flex justify-center py-4 px-4 border border-transparent rounded-xl shadow-lg text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="btn-primary-soft w-full flex justify-center py-4 px-4 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {busy ? (t?.('pleaseWait') || 'Please wait…') : mode === 'register' ? (t?.('createAccount') || 'Create account') : (t?.('signIn') || 'Sign in')}
           </button>

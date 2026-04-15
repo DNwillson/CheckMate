@@ -3,6 +3,7 @@ export const SETTINGS_COPY = {
   en: {
     title: 'Settings',
     displayName: 'Display name',
+    avatarStyle: 'Avatar style',
     displayNameHint: 'Shown in Settings and on your packing avatar. Saved to your account.',
     placeholder: 'Your display name',
     cancel: 'Cancel',
@@ -55,6 +56,7 @@ export const SETTINGS_COPY = {
   zh: {
     title: '设置',
     displayName: '显示名称',
+    avatarStyle: '头像风格',
     displayNameHint: '将显示在设置与打包头像旁，并同步到账号。',
     placeholder: '输入显示名称',
     cancel: '取消',

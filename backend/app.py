@@ -51,6 +51,7 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(256), nullable=False)
     display_name = db.Column(db.String(120), nullable=True)
+    avatar_style = db.Column(db.String(40), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_public_dict(self) -> dict:
@@ -62,7 +63,8 @@ class User(db.Model):
             "db_id": self.id,
             "username": self.username,
             "name": label,
-            "avatar": f"https://api.dicebear.com/7.x/notionists/svg?seed={quote_plus(self.username)}",
+            "avatar": _dicebear_avatar(self.username, self.avatar_style),
+            "avatar_style": _safe_avatar_style(self.avatar_style),
         }
 
 
@@ -2048,14 +2050,38 @@ def _validate_items_assignees(items: Any, allowed_friend_ids: set[str]) -> str |
     return None
 
 
-def _dicebear_avatar(username: str) -> str:
-    return f"https://api.dicebear.com/7.x/notionists/svg?seed={quote_plus(username)}"
+ALLOWED_AVATAR_STYLES = {
+    "notionists",
+    "avataaars",
+    "bottts",
+    "micah",
+    "fun-emoji",
+    "adventurer",
+    "adventurer-neutral",
+    "big-ears",
+    "big-smile",
+    "croodles",
+    "identicon",
+    "lorelei",
+    "open-peeps",
+    "thumbs",
+}
+
+
+def _safe_avatar_style(style: str | None) -> str:
+    s = (style or "").strip().lower()
+    return s if s in ALLOWED_AVATAR_STYLES else "notionists"
+
+
+def _dicebear_avatar(username: str, style: str | None = None) -> str:
+    avatar_style = _safe_avatar_style(style)
+    return f"https://api.dicebear.com/7.x/{quote_plus(avatar_style)}/svg?seed={quote_plus(username)}"
 
 
 def _ensure_friend_mirror_row(owner_user_id: int, target: User) -> Friend:
     fid = f"u{target.id}"
     row = Friend.query.filter_by(user_id=owner_user_id, id=fid).first()
-    av = _dicebear_avatar(target.username)
+    av = _dicebear_avatar(target.username, target.avatar_style)
     dn = (target.display_name or "").strip()
     label = dn if dn else target.username
     if row:
@@ -2165,6 +2191,21 @@ def _ensure_user_display_name_column() -> None:
         logger.debug("users.display_name ensure skipped: %s", e)
 
 
+def _ensure_user_avatar_style_column() -> None:
+    try:
+        insp = inspect(db.engine)
+        if "users" not in insp.get_table_names():
+            return
+        col_names = {c["name"] for c in insp.get_columns("users")}
+        if "avatar_style" in col_names:
+            return
+        with db.engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN avatar_style VARCHAR(40) NULL"))
+        logger.info("Added users.avatar_style column.")
+    except Exception as e:
+        logger.debug("users.avatar_style ensure skipped: %s", e)
+
+
 def _ensure_scenario_shares_can_edit_column() -> None:
     try:
         insp = inspect(db.engine)
@@ -2261,6 +2302,7 @@ def create_app() -> Flask:
         _ensure_prefs_json_column()
         _ensure_friends_linked_user_column()
         _ensure_user_display_name_column()
+        _ensure_user_avatar_style_column()
         _ensure_scenario_shares_can_edit_column()
         _ensure_scenarios_archived_column()
         _ensure_scenarios_trip_datetime_columns()
@@ -2319,11 +2361,18 @@ def create_app() -> Flask:
     @require_auth
     def update_me():
         data = request.get_json(force=True, silent=True) or {}
+        changed = False
         if "display_name" in data:
             s = str(data.get("display_name") or "").strip()
             if len(s) > 48:
                 return jsonify({"error": "Display name too long (max 48)."}), 400
             g.current_user.display_name = s if s else None
+            changed = True
+        if "avatar_style" in data:
+            style = _safe_avatar_style(str(data.get("avatar_style") or ""))
+            g.current_user.avatar_style = style
+            changed = True
+        if changed:
             db.session.commit()
         return jsonify(g.current_user.to_public_dict())
 
@@ -2372,7 +2421,8 @@ def create_app() -> Flask:
                 "user": {
                     "username": target.username,
                     "display_name": dn or None,
-                    "avatar": _dicebear_avatar(target.username),
+                    "avatar": _dicebear_avatar(target.username, target.avatar_style),
+                    "avatar_style": _safe_avatar_style(target.avatar_style),
                 },
             }
         )
@@ -2607,7 +2657,12 @@ def create_app() -> Flask:
                 su = User.query.get(sh.shared_with_user_id)
                 if su:
                     recipients.append(
-                        {"username": su.username, "user_id": su.id, "can_edit": bool(sh.can_edit)}
+                        {
+                            "username": su.username,
+                            "user_id": su.id,
+                            "can_edit": bool(sh.can_edit),
+                            "avatar": _dicebear_avatar(su.username, su.avatar_style),
+                        }
                     )
             d["share_recipients"] = recipients
             out.append(d)
@@ -2621,6 +2676,9 @@ def create_app() -> Flask:
             d["access"] = "shared_edit" if sh.can_edit else "shared"
             d["owner_user_id"] = sh.owner_user_id
             d["owner_username"] = owner.username if owner else "?"
+            d["owner_avatar"] = (
+                _dicebear_avatar(owner.username, owner.avatar_style) if owner else None
+            )
             d["share_recipients"] = []
             out.append(d)
         return jsonify(out)
@@ -2682,6 +2740,9 @@ def create_app() -> Flask:
             d["access"] = "shared_edit" if sh.can_edit else "shared"
             d["owner_user_id"] = sh.owner_user_id
             d["owner_username"] = owner.username if owner else "?"
+            d["owner_avatar"] = (
+                _dicebear_avatar(owner.username, owner.avatar_style) if owner else None
+            )
             d["share_recipients"] = []
             return jsonify(d)
 
@@ -2693,7 +2754,12 @@ def create_app() -> Flask:
             su = User.query.get(sh.shared_with_user_id)
             if su:
                 recipients.append(
-                    {"username": su.username, "user_id": su.id, "can_edit": bool(sh.can_edit)}
+                    {
+                        "username": su.username,
+                        "user_id": su.id,
+                        "can_edit": bool(sh.can_edit),
+                        "avatar": _dicebear_avatar(su.username, su.avatar_style),
+                    }
                 )
         d["share_recipients"] = recipients
         return jsonify(d)
@@ -2800,7 +2866,7 @@ def create_app() -> Flask:
                         "id": f.id,
                         "username": u.username,
                         "name": dn if dn else u.username,
-                        "avatar": _dicebear_avatar(u.username),
+                        "avatar": _dicebear_avatar(u.username, u.avatar_style),
                         "linked_user_id": u.id,
                         "is_registered": True,
                     }

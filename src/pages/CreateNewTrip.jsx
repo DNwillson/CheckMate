@@ -94,7 +94,7 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
           <input
             type="text"
             placeholder="e.g., Beach trip…"
-            className={`w-full text-xl py-3 px-4 ${theme.cardBg} rounded-2xl shadow-sm border-2 border-transparent outline-none ${theme.textMain} placeholder-[#D1D1D1]`}
+            className={`input-soft w-full text-xl py-3 px-4 ${theme.cardBg} ${theme.textMain} placeholder-[#D1D1D1]`}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
@@ -108,7 +108,7 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
                 type="datetime-local"
                 lang={inputLocale}
                 min={minDateTime}
-                className={`w-full py-3 px-4 ${theme.cardBg} rounded-2xl shadow-sm border-2 border-transparent outline-none ${theme.textMain}`}
+                className={`input-soft w-full py-3 px-4 ${theme.cardBg} ${theme.textMain}`}
                 value={tripStartAt}
                 onChange={(e) => setTripStartAt(e.target.value)}
               />
@@ -119,7 +119,7 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
                 type="datetime-local"
                 lang={inputLocale}
                 min={tripStartAt || minDateTime}
-                className={`w-full py-3 px-4 ${theme.cardBg} rounded-2xl shadow-sm border-2 border-transparent outline-none ${theme.textMain}`}
+                className={`input-soft w-full py-3 px-4 ${theme.cardBg} ${theme.textMain}`}
                 value={tripEndAt}
                 onChange={(e) => setTripEndAt(e.target.value)}
               />
@@ -150,7 +150,7 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
                 type="button"
                 onClick={() => addItem(criticalInput, true)}
                 disabled={!criticalInput.trim()}
-                className={`p-2 rounded-lg ${criticalInput.trim() ? `${theme.primary} text-white` : 'bg-[#F5F5F5] text-[#D1D1D1]'}`}
+                className={`p-2 rounded-lg ${criticalInput.trim() ? `btn-primary-soft ${theme.primary} text-white` : 'bg-[#F5F5F5] text-[#D1D1D1]'}`}
               >
                 <Plus size={16} />
               </button>
@@ -178,7 +178,7 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
                 type="button"
                 onClick={() => addItem(optionalInput, false)}
                 disabled={!optionalInput.trim()}
-                className={`p-2 rounded-lg ${optionalInput.trim() ? `${theme.primary} text-white` : 'bg-[#F5F5F5] text-[#D1D1D1]'}`}
+                className={`p-2 rounded-lg ${optionalInput.trim() ? `btn-primary-soft ${theme.primary} text-white` : 'bg-[#F5F5F5] text-[#D1D1D1]'}`}
               >
                 <Plus size={16} />
               </button>
@@ -200,7 +200,7 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
                 <button
                   type="button"
                   onClick={() => setItems(items.filter((i) => i.id !== item.id))}
-                  className="text-[#D1D1D1] hover:text-[#D98282] p-1"
+                  className="btn-ghost-soft text-[#D1D1D1] hover:text-[#D98282] p-1 rounded-lg"
                 >
                   <Trash2 size={17} />
                 </button>

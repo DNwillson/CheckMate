@@ -80,10 +80,15 @@ const LibraryItem = ({
         <Icon size={20} />
       </div>
       <div className="flex-1 min-w-0">
-        {scenario.access === 'shared' ? (
-          <p className="text-[10px] font-bold text-sky-600 uppercase tracking-wide mb-0.5">
-            Shared · @{scenario.owner_username}
-          </p>
+        {scenario.access === 'shared' || scenario.access === 'shared_edit' ? (
+          <div className="flex items-center gap-1.5 mb-0.5">
+            {scenario.owner_avatar ? (
+              <img src={scenario.owner_avatar} alt="" className="w-4 h-4 rounded-full bg-white object-cover" />
+            ) : null}
+            <p className="text-[10px] font-bold text-sky-600 uppercase tracking-wide">
+              Shared · @{scenario.owner_username}
+            </p>
+          </div>
         ) : null}
         <h4 className={`font-bold ${theme.textMain} truncate`}>{scenario.name}</h4>
         <p className={`text-xs ${theme.textSub} mt-0.5`}>
@@ -99,7 +104,7 @@ const LibraryItem = ({
             e.stopPropagation();
             onDelete(scenario.id);
           }}
-          className="w-9 h-9 shrink-0 flex items-center justify-center text-[#D9D9D9] hover:text-[#D98282] hover:bg-[#FADCDC]/80 rounded-full transition-colors"
+          className="btn-ghost-soft w-9 h-9 shrink-0 flex items-center justify-center text-[#D9D9D9] hover:text-[#D98282] rounded-full"
         >
           <Trash2 size={16} />
         </button>
@@ -376,7 +381,7 @@ const MyProfileAndLibrary = ({
                   <button
                     type="button"
                     onClick={onCreateClick}
-                    className={`${theme.primaryLight} ${theme.primaryText} px-3 py-1.5 rounded-lg text-xs font-bold hover:opacity-90 transition-opacity`}
+                    className={`btn-secondary-soft ${theme.primaryLight} ${theme.primaryText} px-3 py-1.5 rounded-lg text-xs font-bold`}
                   >
                     + New trip
                   </button>
@@ -407,7 +412,7 @@ const MyProfileAndLibrary = ({
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
                       selectedTripIds.length === 0
                         ? 'bg-slate-200 text-slate-400'
-                        : 'bg-[#D98282] text-white'
+                        : 'btn-danger-soft'
                     }`}
                   >
                     Delete selected
@@ -572,7 +577,7 @@ const MyProfileAndLibrary = ({
                           }
                         })();
                       }}
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                      className={`btn-ghost-soft w-9 h-9 rounded-xl flex items-center justify-center ${
                         theme.isDark ? 'hover:bg-red-950/40 text-red-300' : 'hover:bg-[#FADCDC] text-[#D98282]'
                       } disabled:opacity-50`}
                     >
@@ -639,7 +644,7 @@ const MyProfileAndLibrary = ({
                       }
                     })();
                   }}
-                  className={`shrink-0 px-4 py-2 rounded-xl text-xs font-bold text-white ${theme.primary} disabled:opacity-50`}
+                  className={`btn-primary-soft shrink-0 px-4 py-2 rounded-xl text-xs font-bold text-white ${theme.primary} disabled:opacity-50`}
                 >
                   Send
                 </button>
@@ -665,7 +670,7 @@ const MyProfileAndLibrary = ({
                   <p className={`text-[11px] font-medium ${theme.textMain}`}>Accept their pending request?</p>
                   <button
                     type="button"
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold text-white ${theme.primary}`}
+                    className={`btn-primary-soft px-3 py-1.5 rounded-lg text-xs font-bold text-white ${theme.primary}`}
                     onClick={() => {
                       void (async () => {
                         try {
@@ -716,7 +721,7 @@ const MyProfileAndLibrary = ({
                               }
                             })();
                           }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold ${
+                          className={`btn-secondary-soft px-3 py-1.5 rounded-lg text-xs font-bold ${
                             theme.isDark ? 'bg-slate-800 text-slate-300' : 'bg-gray-100 text-gray-600'
                           }`}
                         >
@@ -735,7 +740,7 @@ const MyProfileAndLibrary = ({
                               }
                             })();
                           }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold text-white ${theme.primary}`}
+                          className={`btn-primary-soft px-3 py-1.5 rounded-lg text-xs font-bold text-white ${theme.primary}`}
                         >
                           Accept
                         </button>
@@ -809,7 +814,7 @@ const MyProfileAndLibrary = ({
                             setDeleteError('');
                             setDeleteId(friend.id);
                           }}
-                          className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                          className={`btn-ghost-soft w-9 h-9 rounded-xl flex items-center justify-center ${
                             theme.isDark ? 'hover:bg-red-950/40 text-red-300' : 'hover:bg-[#FADCDC] text-[#D98282]'
                           }`}
                         >
@@ -844,7 +849,7 @@ const MyProfileAndLibrary = ({
                   setDeleteId(null);
                   setDeleteError('');
                 }}
-                className={`flex-1 py-3 rounded-xl font-bold text-sm ${
+                className={`btn-secondary-soft flex-1 py-3 rounded-xl font-bold text-sm ${
                   theme.isDark ? 'bg-slate-800 text-slate-200' : 'bg-gray-100 text-gray-600'
                 }`}
               >
@@ -854,7 +859,7 @@ const MyProfileAndLibrary = ({
                 type="button"
                 disabled={busy}
                 onClick={() => void confirmDelete()}
-                className="flex-1 py-3 rounded-xl font-bold text-sm text-white bg-[#D98282] hover:opacity-95 disabled:opacity-50"
+                className="btn-danger-soft flex-1 py-3 rounded-xl font-bold text-sm disabled:opacity-50"
               >
                 Remove
               </button>
@@ -877,7 +882,7 @@ const MyProfileAndLibrary = ({
                 type="button"
                 disabled={confirmBusy}
                 onClick={() => setConfirmDialog(null)}
-                className={`flex-1 py-3 rounded-xl font-bold text-sm ${
+                className={`btn-secondary-soft flex-1 py-3 rounded-xl font-bold text-sm ${
                   theme.isDark ? 'bg-slate-800 text-slate-200' : 'bg-gray-100 text-gray-600'
                 }`}
               >
@@ -887,7 +892,7 @@ const MyProfileAndLibrary = ({
                 type="button"
                 disabled={confirmBusy}
                 onClick={() => void runConfirmAction()}
-                className="flex-1 py-3 rounded-xl font-bold text-sm text-white bg-[#D98282] hover:opacity-95 disabled:opacity-50"
+                className="btn-danger-soft flex-1 py-3 rounded-xl font-bold text-sm disabled:opacity-50"
               >
                 {confirmBusy ? 'Please wait…' : confirmDialog.confirmLabel || 'Confirm'}
               </button>

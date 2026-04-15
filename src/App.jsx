@@ -20,7 +20,7 @@ const NavItem = ({ icon: Icon, label, active, onClick, theme }) => (
   <button
     onClick={onClick}
     className={`flex flex-col items-center space-y-1 transition-all duration-300 ${
-      active ? `${theme.primaryText} scale-110` : theme.navMuted
+      active ? `${theme.primaryText} scale-105` : `${theme.navMuted} hover:opacity-95`
     }`}
   >
     <Icon size={26} strokeWidth={active ? 2.5 : 2} />
@@ -61,6 +61,7 @@ export default function App() {
   const [weatherError, setWeatherError] = useState(null);
   /** Same query params as last /api/weather call — used for /api/weather/detail. */
   const [weatherFetchParams, setWeatherFetchParams] = useState({});
+  const [weatherDetail, setWeatherDetail] = useState(null);
   const [appPrefs, setAppPrefs] = useState(DEFAULT_APP_PREFS);
   const [meInitialSegment, setMeInitialSegment] = useState(null);
   const [lastPacked, setLastPacked] = useState(null);
@@ -114,16 +115,18 @@ export default function App() {
       );
     });
     try {
-      const data = coords
-        ? await api.getWeather({ lat: coords.lat, lon: coords.lon, label: coords.label })
-        : await api.getWeather();
-      setWeatherFetchParams(
-        coords ? { lat: coords.lat, lon: coords.lon, label: coords.label } : {},
-      );
+      const params = coords ? { lat: coords.lat, lon: coords.lon, label: coords.label } : {};
+      const [data, detail] = await Promise.all([
+        api.getWeather(params),
+        api.getWeatherDetail(params),
+      ]);
+      setWeatherFetchParams(params);
       setWeather({ ...WEATHER_FALLBACK, ...data });
+      setWeatherDetail(detail || null);
     } catch (e) {
       const msg = e?.message || 'Weather could not be loaded.';
       setWeatherError(msg);
+      setWeatherDetail(null);
       setWeather((prev) =>
         prev && prev.location && prev.location !== WEATHER_FALLBACK.location ? prev : WEATHER_FALLBACK,
       );
@@ -235,6 +238,7 @@ export default function App() {
     setHistory([]);
     setWeather(WEATHER_FALLBACK);
     setWeatherFetchParams({});
+    setWeatherDetail(null);
     setWeatherError(null);
     setWeatherLoading(false);
     setActiveScenarioOwnerId(null);
@@ -290,9 +294,9 @@ export default function App() {
     }
   }, []);
 
-  const handleSaveProfileDisplayName = useCallback(async (name) => {
+  const handleSaveProfile = useCallback(async ({ displayName, avatarStyle }) => {
     if (!currentUser?.username) return;
-    const user = await api.putMe({ display_name: name });
+    const user = await api.putMe({ display_name: displayName, avatar_style: avatarStyle });
     setCurrentUser(user);
   }, [currentUser]);
 
@@ -391,10 +395,20 @@ export default function App() {
   );
 
   const handleAppendWeatherItems = useCallback(
-    async ({ scenarioId, items }) => {
+    async ({ scenarioId, items, tipDate }) => {
       const target = scenarios.find((s) => s.id === scenarioId);
       if (!target) throw new Error('Trip not found.');
       if (target.access === 'shared') throw new Error('This trip is view-only.');
+      const targetDate = tipDate ? new Date(tipDate) : new Date();
+      const startAt = target.trip_start_at ? new Date(target.trip_start_at) : null;
+      const isToday =
+        !!startAt &&
+        !Number.isNaN(targetDate.getTime()) &&
+        !Number.isNaN(startAt.getTime()) &&
+        startAt.getFullYear() === targetDate.getFullYear() &&
+        startAt.getMonth() === targetDate.getMonth() &&
+        startAt.getDate() === targetDate.getDate();
+      if (!isToday) throw new Error('Weather tips can only be added to trips on the selected date.');
 
       const incoming = Array.isArray(items) ? items : [];
       if (!incoming.length) throw new Error('No items to import.');
@@ -579,6 +593,7 @@ export default function App() {
             weatherError={weatherError}
             onRefreshWeather={loadWeather}
             weatherFetchParams={weatherFetchParams}
+            weatherDetail={weatherDetail}
             theme={THEME}
             t={t}
           />
@@ -642,7 +657,7 @@ export default function App() {
             currentThemeKey={currentThemeKey}
             onChangeTheme={handleChangeTheme}
             currentUser={meProfile}
-            onSaveProfileDisplayName={handleSaveProfileDisplayName}
+            onSaveProfileDisplayName={handleSaveProfile}
             onChangePassword={handleChangePassword}
             onDeleteAccount={handleDeleteAccount}
             appPrefs={appPrefs}
@@ -791,7 +806,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setIsChatOpen(true)}
-                className={`w-16 h-16 ${THEME.primary} rounded-full flex items-center justify-center shadow-lg shadow-[#E6B89C]/40 active:scale-95 transition-all group-hover:scale-110 border-4 ${THEME.fabRing}`}
+                className={`btn-primary-soft w-16 h-16 ${THEME.primary} rounded-full flex items-center justify-center shadow-lg shadow-[#E6B89C]/40 group-hover:scale-[1.06] border-4 ${THEME.fabRing}`}
               >
                 <Sparkles className="text-white w-7 h-7" />
               </button>

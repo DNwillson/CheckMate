@@ -48,6 +48,7 @@ const HomeDashboard = ({
   weatherError,
   onRefreshWeather,
   weatherFetchParams,
+  weatherDetail,
   theme,
   t,
 }) => {
@@ -56,6 +57,8 @@ const HomeDashboard = ({
   const [weatherTargetTripId, setWeatherTargetTripId] = useState('');
   const [weatherAddBusy, setWeatherAddBusy] = useState(false);
   const [weatherAddMsg, setWeatherAddMsg] = useState('');
+  const [selectedWeatherTipTexts, setSelectedWeatherTipTexts] = useState([]);
+  const [selectedWeatherTipDate, setSelectedWeatherTipDate] = useState('');
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -69,10 +72,64 @@ const HomeDashboard = ({
   const hint =
     weather?.packingHint || (weatherLoading ? 'Fetching live forecast…' : 'Tap refresh to load weather.');
   const tempUnit = weather?.tempUnit || 'C';
+  const tipTargetDate = selectedWeatherTipDate || new Date().toISOString().slice(0, 10);
+  const tipDateLabel = useMemo(() => {
+    try {
+      return new Date(tipTargetDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    } catch {
+      return tipTargetDate;
+    }
+  }, [tipTargetDate]);
+  const weatherTipDays = useMemo(() => {
+    const days = Array.isArray(weatherDetail?.daily) ? weatherDetail.daily : [];
+    return days.slice(0, 7);
+  }, [weatherDetail]);
+  const selectedTipDayWeather = useMemo(
+    () => weatherTipDays.find((d) => d?.date === tipTargetDate) || null,
+    [weatherTipDays, tipTargetDate],
+  );
+  const weatherTipSummary = useMemo(() => {
+    if (selectedTipDayWeather) {
+      const parts = [];
+      if (selectedTipDayWeather.condition) parts.push(selectedTipDayWeather.condition);
+      if (selectedTipDayWeather.max != null || selectedTipDayWeather.min != null) {
+        parts.push(`High ${selectedTipDayWeather.max ?? '—'}° / Low ${selectedTipDayWeather.min ?? '—'}°`);
+      }
+      if (selectedTipDayWeather.uvIndexMax != null) {
+        parts.push(`UV ${selectedTipDayWeather.uvIndexMax}`);
+      }
+      if (selectedTipDayWeather.precipProbMax != null) {
+        parts.push(`Rain chance ${selectedTipDayWeather.precipProbMax}%`);
+      }
+      return parts.length ? parts.join(' · ') : (t?.('weatherSmartTipsDesc') || 'Based on weather forecast.');
+    }
+    const fallback = [];
+    if (weather?.condition) fallback.push(weather.condition);
+    if (weather?.temp != null) fallback.push(`${weather.temp}°${tempUnit}`);
+    if (weather?.windKmh != null) fallback.push(`Wind ${weather.windKmh} km/h`);
+    if (weather?.humidity != null) fallback.push(`Humidity ${weather.humidity}%`);
+    if (weather?.uvIndex != null) fallback.push(`UV ${weather.uvIndex}`);
+    return fallback.length ? fallback.join(' · ') : (t?.('weatherSmartTipsDesc') || 'Based on weather forecast.');
+  }, [selectedTipDayWeather, t, tempUnit, weather]);
   const myTrips = useMemo(
     () => scenarios.filter((s) => s.type === 'custom' && s.access !== 'shared' && !s.archived),
     [scenarios],
   );
+  const weatherEligibleTrips = useMemo(() => {
+    const target = new Date(tipTargetDate);
+    if (Number.isNaN(target.getTime())) return [];
+    const isSameLocalDate = (dateLike) => {
+      if (!dateLike) return false;
+      const d = new Date(dateLike);
+      if (Number.isNaN(d.getTime())) return false;
+      return (
+        d.getFullYear() === target.getFullYear() &&
+        d.getMonth() === target.getMonth() &&
+        d.getDate() === target.getDate()
+      );
+    };
+    return myTrips.filter((s) => isSameLocalDate(s.trip_start_at));
+  }, [myTrips, tipTargetDate]);
   const weatherPackingItems = useMemo(() => {
     const out = [];
     const push = (text, critical = false) => {
@@ -80,11 +137,12 @@ const HomeDashboard = ({
       if (out.some((x) => x.text.toLowerCase() === text.toLowerCase())) return;
       out.push({ text, critical, assignedTo: 'me' });
     };
-    const uv = Number(weather?.uvIndex);
-    const humidity = Number(weather?.humidity);
-    const wind = Number(weather?.windKmh);
-    const temp = Number(weather?.temp);
-    const code = Number(weather?.weatherCode);
+    const isTodaySelected = tipTargetDate === new Date().toISOString().slice(0, 10);
+    const uv = Number(selectedTipDayWeather?.uvIndexMax ?? weather?.uvIndex);
+    const humidity = Number(isTodaySelected ? weather?.humidity : undefined);
+    const wind = Number(isTodaySelected ? weather?.windKmh : undefined);
+    const temp = Number(selectedTipDayWeather?.max ?? weather?.temp);
+    const code = Number(selectedTipDayWeather?.weatherCode ?? weather?.weatherCode);
 
     if (!Number.isNaN(uv) && uv >= 6) {
       push('Sunscreen (SPF 30+)', true);
@@ -115,16 +173,40 @@ const HomeDashboard = ({
       push('Warm socks', false);
     }
     return out.slice(0, 6);
-  }, [weather]);
+  }, [selectedTipDayWeather, tipTargetDate, weather]);
+  const selectedWeatherPackingItems = useMemo(
+    () => weatherPackingItems.filter((it) => selectedWeatherTipTexts.includes(it.text)),
+    [weatherPackingItems, selectedWeatherTipTexts],
+  );
 
   useEffect(() => {
-    if (!myTrips.length) {
+    if (!weatherEligibleTrips.length) {
       setWeatherTargetTripId('');
       return;
     }
-    if (myTrips.some((s) => s.id === weatherTargetTripId)) return;
-    setWeatherTargetTripId(myTrips[0].id);
-  }, [myTrips, weatherTargetTripId]);
+    if (weatherEligibleTrips.some((s) => s.id === weatherTargetTripId)) return;
+    setWeatherTargetTripId(weatherEligibleTrips[0].id);
+  }, [weatherEligibleTrips, weatherTargetTripId]);
+
+  useEffect(() => {
+    const allTipTexts = weatherPackingItems.map((it) => it.text);
+    setSelectedWeatherTipTexts((prev) => {
+      const kept = prev.filter((text) => allTipTexts.includes(text));
+      if (kept.length) return kept;
+      return allTipTexts;
+    });
+  }, [weatherPackingItems]);
+
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    if (!weatherTipDays.length) {
+      setSelectedWeatherTipDate(today);
+      return;
+    }
+    if (weatherTipDays.some((d) => d?.date === selectedWeatherTipDate)) return;
+    const defaultDay = weatherTipDays.find((d) => d?.date === today)?.date || weatherTipDays[0]?.date || today;
+    setSelectedWeatherTipDate(defaultDay);
+  }, [weatherTipDays, selectedWeatherTipDate]);
 
   return (
     <div className="p-6 pb-28 space-y-6 animate-fade-in">
@@ -139,7 +221,7 @@ const HomeDashboard = ({
         <button
           type="button"
           onClick={onSettingsClick}
-          className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm hover:shadow-md transition-shadow"
+          className="btn-icon-soft w-10 h-10 rounded-full flex items-center justify-center"
         >
           <Settings size={20} className="text-[#9A9A9A]" />
         </button>
@@ -157,7 +239,7 @@ const HomeDashboard = ({
             onRefreshWeather();
           }}
           disabled={weatherLoading}
-          className="absolute top-3 right-3 z-20 p-2.5 rounded-2xl bg-white/70 hover:bg-white shadow-sm text-slate-600 disabled:opacity-50 transition-all backdrop-blur-sm"
+          className="btn-secondary-soft absolute top-3 right-3 z-20 p-2.5 rounded-2xl text-slate-600 disabled:opacity-50"
           title={t?.('refreshWeather') || 'Refresh weather'}
           aria-label={t?.('refreshWeather') || 'Refresh weather'}
         >
@@ -228,7 +310,7 @@ const HomeDashboard = ({
             <button
               type="button"
               onClick={() => setTipsExpanded((v) => !v)}
-              className={`text-[11px] font-bold px-2.5 py-1 rounded-lg ${
+              className={`btn-secondary-soft text-[11px] font-bold px-2.5 py-1 rounded-lg ${
                 theme.isDark ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-600'
               }`}
             >
@@ -239,14 +321,42 @@ const HomeDashboard = ({
         {tipsExpanded ? (
           <>
             <p className={`text-[11px] ${theme.textSub} mb-2`}>
-              {t?.('weatherSmartTipsDesc') || 'Based on UV, humidity, wind, and temperature.'}
+              {weatherTipSummary}
             </p>
+            {weatherTipDays.length ? (
+              <div className="mb-2">
+                <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                  {weatherTipDays.map((d) => {
+                    const active = d.date === tipTargetDate;
+                    return (
+                      <button
+                        key={d.date}
+                        type="button"
+                        onClick={() => setSelectedWeatherTipDate(d.date)}
+                        className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold border transition-colors ${
+                          active
+                            ? `${theme.primary} text-white border-transparent`
+                            : theme.isDark
+                              ? 'bg-slate-800 text-slate-200 border-slate-700'
+                              : 'bg-slate-50 text-slate-700 border-slate-200'
+                        }`}
+                      >
+                        {new Date(d.date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' })}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className={`text-[10px] mt-1 ${theme.textSub}`}>
+                  {`Tips for ${tipDateLabel}`}
+                </p>
+              </div>
+            ) : null}
             {weatherPackingItems.length > 0 ? (
               <div className="space-y-1 mb-2">
                 {weatherPackingItems.map((it) => (
-                  <div
+                  <label
                     key={it.text}
-                    className={`text-[11px] rounded-md px-2 py-1.5 border ${
+                    className={`text-[11px] rounded-md px-2 py-1.5 border flex items-start gap-2 cursor-pointer ${
                       it.critical
                         ? theme.isDark
                           ? 'border-rose-900/60 bg-rose-950/30 text-rose-200'
@@ -256,9 +366,21 @@ const HomeDashboard = ({
                           : 'border-slate-200 bg-slate-50 text-slate-700'
                     }`}
                   >
-                    {it.critical ? 'Must: ' : 'Tip: '}
-                    {it.text}
-                  </div>
+                    <input
+                      type="checkbox"
+                      checked={selectedWeatherTipTexts.includes(it.text)}
+                      onChange={(e) => {
+                        setSelectedWeatherTipTexts((prev) =>
+                          e.target.checked ? [...prev, it.text] : prev.filter((text) => text !== it.text),
+                        );
+                      }}
+                      className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300"
+                    />
+                    <span>
+                      {it.critical ? 'Must: ' : 'Tip: '}
+                      {it.text}
+                    </span>
+                  </label>
                 ))}
               </div>
             ) : (
@@ -266,26 +388,33 @@ const HomeDashboard = ({
                 {t?.('weatherSmartNoExtra') || 'No extra weather-specific items suggested right now.'}
               </p>
             )}
+            {weatherPackingItems.length > 0 ? (
+              <div className="mb-2 text-[11px]">
+                <span className={`${theme.textSub}`}>
+                  {selectedWeatherPackingItems.length}/{weatherPackingItems.length}
+                </span>
+              </div>
+            ) : null}
             <div className="flex gap-2">
               <select
                 value={weatherTargetTripId}
                 onChange={(e) => setWeatherTargetTripId(e.target.value)}
-                disabled={!myTrips.length || weatherAddBusy}
+                disabled={!weatherEligibleTrips.length || weatherAddBusy}
                 className="flex-1 px-2.5 py-2 rounded-xl border text-xs bg-white"
               >
-                {myTrips.length ? (
-                  myTrips.map((s) => (
+                {weatherEligibleTrips.length ? (
+                  weatherEligibleTrips.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
                     </option>
                   ))
                 ) : (
-                  <option value="">{t?.('weatherNoTripOption') || 'Create a trip first'}</option>
+                  <option value="">{t?.('weatherNoTripOption') || 'No trip scheduled for selected date'}</option>
                 )}
               </select>
               <button
                 type="button"
-                disabled={!weatherTargetTripId || !weatherPackingItems.length || weatherAddBusy}
+                disabled={!weatherTargetTripId || !selectedWeatherPackingItems.length || weatherAddBusy}
                 onClick={() => {
                   void (async () => {
                     if (!onAddWeatherItems) return;
@@ -294,7 +423,8 @@ const HomeDashboard = ({
                     try {
                       await onAddWeatherItems({
                         scenarioId: weatherTargetTripId,
-                        items: weatherPackingItems,
+                        items: selectedWeatherPackingItems,
+                        tipDate: tipTargetDate,
                       });
                       setWeatherAddMsg(t?.('weatherAddOk') || 'Added weather tips to your trip.');
                     } catch (e) {
@@ -305,9 +435,9 @@ const HomeDashboard = ({
                   })();
                 }}
                 className={`px-3 py-2 rounded-xl text-xs font-bold ${
-                  !weatherTargetTripId || !weatherPackingItems.length || weatherAddBusy
+                  !weatherTargetTripId || !selectedWeatherPackingItems.length || weatherAddBusy
                     ? 'bg-slate-200 text-slate-400'
-                    : `${theme.primary} text-white`
+                    : `btn-primary-soft ${theme.primary} text-white`
                 }`}
               >
                 {t?.('weatherAddBtn') || 'Add to trip'}
@@ -345,10 +475,15 @@ const HomeDashboard = ({
                     <Icon size={24} strokeWidth={1.5} />
                   </div>
                   <div>
-                    {scenario.access === 'shared' ? (
-                      <p className="text-[10px] font-bold text-sky-600 uppercase tracking-wide mb-0.5">
-                        {(t?.('fromUser') || 'From')} @{scenario.owner_username}
-                      </p>
+                    {scenario.access === 'shared' || scenario.access === 'shared_edit' ? (
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        {scenario.owner_avatar ? (
+                          <img src={scenario.owner_avatar} alt="" className="w-4 h-4 rounded-full bg-white object-cover" />
+                        ) : null}
+                        <p className="text-[10px] font-bold text-sky-600 uppercase tracking-wide">
+                          {(t?.('fromUser') || 'From')} @{scenario.owner_username}
+                        </p>
+                      </div>
                     ) : null}
                     {scenario.trip_start_at ? (
                       <p

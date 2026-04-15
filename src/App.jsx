@@ -116,10 +116,15 @@ export default function App() {
     });
     try {
       const params = coords ? { lat: coords.lat, lon: coords.lon, label: coords.label } : {};
-      const [data, detail] = await Promise.all([
+      const [weatherRes, detailRes] = await Promise.allSettled([
         api.getWeather(params),
         api.getWeatherDetail(params),
       ]);
+      if (weatherRes.status !== 'fulfilled') {
+        throw weatherRes.reason || new Error('Weather could not be loaded.');
+      }
+      const data = weatherRes.value;
+      const detail = detailRes.status === 'fulfilled' ? detailRes.value : null;
       setWeatherFetchParams(params);
       setWeather({ ...WEATHER_FALLBACK, ...data });
       setWeatherDetail(detail || null);

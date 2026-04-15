@@ -79,6 +79,7 @@ export const api = {
   deleteAccount: () => request('/api/me', { method: 'DELETE' }),
 
   getScenarios: () => request('/api/scenarios'),
+  getScenario: (id) => request(`/api/scenarios/${encodeURIComponent(id)}`),
   createScenario: (payload) => request('/api/scenarios', { method: 'POST', body: JSON.stringify(payload) }),
   updateScenario: (id, payload) =>
     request(`/api/scenarios/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(payload) }),

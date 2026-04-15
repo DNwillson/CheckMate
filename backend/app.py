@@ -214,6 +214,13 @@ def _parse_iso_datetime(value: Any) -> datetime | None:
     return datetime.fromisoformat(s)
 
 
+def _is_past_datetime(value: datetime | None) -> bool:
+    if value is None:
+        return False
+    now = datetime.now(value.tzinfo) if value.tzinfo else datetime.now()
+    return value < now
+
+
 class AppPreference(db.Model):
     __tablename__ = "app_preferences"
 
@@ -2635,6 +2642,8 @@ def create_app() -> Flask:
             trip_end_at = _parse_iso_datetime(payload.get("trip_end_at"))
         except Exception:
             return jsonify({"error": "Invalid trip date/time format."}), 400
+        if _is_past_datetime(trip_start_at):
+            return jsonify({"error": "Trip start time cannot be in the past."}), 400
         if trip_start_at and trip_end_at and trip_end_at < trip_start_at:
             return jsonify({"error": "Trip end time must be after start time."}), 400
         row = Scenario(
@@ -2653,6 +2662,41 @@ def create_app() -> Flask:
         db.session.add(row)
         db.session.commit()
         return jsonify(row.to_dict()), 201
+
+    @app.get("/api/scenarios/<scenario_id>")
+    @require_auth
+    def get_scenario(scenario_id: str):
+        uid = g.current_user.id
+        row = Scenario.query.filter_by(user_id=uid, id=scenario_id).first()
+        if not row:
+            sh = ScenarioShare.query.filter_by(
+                shared_with_user_id=uid, scenario_id=scenario_id
+            ).first()
+            if not sh:
+                return jsonify({"error": "not found"}), 404
+            row = Scenario.query.filter_by(user_id=sh.owner_user_id, id=scenario_id).first()
+            if not row:
+                return jsonify({"error": "not found"}), 404
+            owner = User.query.get(sh.owner_user_id)
+            d = dict(row.to_dict())
+            d["access"] = "shared_edit" if sh.can_edit else "shared"
+            d["owner_user_id"] = sh.owner_user_id
+            d["owner_username"] = owner.username if owner else "?"
+            d["share_recipients"] = []
+            return jsonify(d)
+
+        d = dict(row.to_dict())
+        d["access"] = "owner"
+        share_rows = ScenarioShare.query.filter_by(owner_user_id=uid, scenario_id=row.id).all()
+        recipients: list[dict[str, Any]] = []
+        for sh in share_rows:
+            su = User.query.get(sh.shared_with_user_id)
+            if su:
+                recipients.append(
+                    {"username": su.username, "user_id": su.id, "can_edit": bool(sh.can_edit)}
+                )
+        d["share_recipients"] = recipients
+        return jsonify(d)
 
     @app.put("/api/scenarios/<scenario_id>")
     @require_auth
@@ -2699,6 +2743,8 @@ def create_app() -> Flask:
                 next_end = _parse_iso_datetime(payload.get("trip_end_at", row.trip_end_at))
             except Exception:
                 return jsonify({"error": "Invalid trip date/time format."}), 400
+            if "trip_start_at" in payload and _is_past_datetime(next_start):
+                return jsonify({"error": "Trip start time cannot be in the past."}), 400
             if next_start and next_end and next_end < next_start:
                 return jsonify({"error": "Trip end time must be after start time."}), 400
             row.trip_start_at = next_start

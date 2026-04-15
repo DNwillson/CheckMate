@@ -530,14 +530,29 @@ export default function App() {
     async (scenarioId) => {
       const sid = String(scenarioId || '').trim();
       if (!sid) return;
-      await api.updateScenario(sid, { archived: false });
-      await refreshData();
-      setActiveTab('me');
+      const scenario = await api.getScenario(sid);
+      setActiveScenarioId(null);
       setActiveScenarioOwnerId(null);
-      setActiveScenarioId(sid);
-      setCurrentView('detail');
+      setMeInitialSegment('scenarios');
+      setActiveTab('me');
+      setQuickTemplateDraft({
+        name: scenario?.name || 'Trip',
+        icon: scenario?.icon || 'Backpack',
+        theme: scenario?.theme || { bg: THEME.primaryLight, text: THEME.primaryText },
+        items: Array.isArray(scenario?.items)
+          ? scenario.items.map((it) => ({
+              id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+              text: String(it?.text || '').trim(),
+              critical: !!it?.critical,
+              assignedTo: 'me',
+            }))
+          : [],
+        trip_start_at: null,
+        trip_end_at: null,
+      });
+      setCurrentView('create');
     },
-    [refreshData],
+    [THEME.primaryLight, THEME.primaryText],
   );
 
   const meProfile = useMemo(() => {

@@ -9,6 +9,7 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
   const [criticalInput, setCriticalInput] = useState('');
   const [optionalInput, setOptionalInput] = useState('');
   const inputLocale = language === 'zh' ? 'zh-CN' : 'en-US';
+  const minDateTime = new Date().toISOString().slice(0, 16);
 
   useEffect(() => {
     if (!initialTrip) {
@@ -48,6 +49,10 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
 
   const handleSave = async () => {
     if (!name || items.length === 0) return;
+    if (tripStartAt && new Date(tripStartAt) < new Date()) {
+      window.alert('Trip start time cannot be in the past.');
+      return;
+    }
     if (tripStartAt && tripEndAt && new Date(tripEndAt) < new Date(tripStartAt)) {
       window.alert('Trip end time must be after start time.');
       return;
@@ -102,6 +107,7 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
               <input
                 type="datetime-local"
                 lang={inputLocale}
+                min={minDateTime}
                 className={`w-full py-3 px-4 ${theme.cardBg} rounded-2xl shadow-sm border-2 border-transparent outline-none ${theme.textMain}`}
                 value={tripStartAt}
                 onChange={(e) => setTripStartAt(e.target.value)}
@@ -112,6 +118,7 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
               <input
                 type="datetime-local"
                 lang={inputLocale}
+                min={tripStartAt || minDateTime}
                 className={`w-full py-3 px-4 ${theme.cardBg} rounded-2xl shadow-sm border-2 border-transparent outline-none ${theme.textMain}`}
                 value={tripEndAt}
                 onChange={(e) => setTripEndAt(e.target.value)}

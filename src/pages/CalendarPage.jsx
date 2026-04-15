@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock3 } from 'lucide-react';
 
 const WEEK_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -73,6 +73,7 @@ const CalendarPage = ({
   );
 
   const longPressMs = 550;
+  const now = new Date();
 
   return (
     <div className="p-6 pb-28 space-y-5 animate-fade-in">
@@ -83,12 +84,18 @@ const CalendarPage = ({
         </p>
       </div>
 
-      <div className={`rounded-3xl p-4 border ${theme.isDark ? 'border-slate-700/70 bg-slate-900/40' : 'border-[#EFEFEF] bg-white'}`}>
+      <div
+        className={`rounded-[28px] p-4 border shadow-sm ${
+          theme.isDark ? 'border-slate-700/70 bg-slate-900/50' : 'border-[#ECECEC] bg-white'
+        }`}
+      >
         <div className="flex items-center justify-between mb-4">
           <button
             type="button"
             onClick={() => setCursor(new Date(year, month - 1, 1))}
-            className={`w-9 h-9 rounded-xl flex items-center justify-center ${theme.isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}
+            className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+              theme.isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+            }`}
           >
             <ChevronLeft size={18} />
           </button>
@@ -96,7 +103,9 @@ const CalendarPage = ({
           <button
             type="button"
             onClick={() => setCursor(new Date(year, month + 1, 1))}
-            className={`w-9 h-9 rounded-xl flex items-center justify-center ${theme.isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}
+            className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
+              theme.isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-300' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+            }`}
           >
             <ChevronRight size={18} />
           </button>
@@ -165,7 +174,7 @@ const CalendarPage = ({
                   !cell.currentMonth
                     ? 'text-slate-300 cursor-default'
                     : selected
-                      ? `${theme.primary} text-white`
+                      ? `${theme.primary} text-white shadow-sm`
                       : isToday
                         ? `${theme.primaryLight} ${theme.primaryText}`
                         : `${theme.textMain} hover:bg-slate-100`
@@ -181,7 +190,11 @@ const CalendarPage = ({
         </div>
       </div>
 
-      <div className={`rounded-2xl p-4 border ${theme.isDark ? 'border-slate-700/70 bg-slate-900/40' : 'border-[#EFEFEF] bg-white'}`}>
+      <div
+        className={`rounded-[24px] p-4 border shadow-sm ${
+          theme.isDark ? 'border-slate-700/70 bg-slate-900/45' : 'border-[#ECECEC] bg-white'
+        }`}
+      >
         <h3 className={`text-sm font-bold ${theme.textMain}`}>
           {(t?.('calendarSelectedDateLabel') || 'Selected date')}: {year}-{String(month + 1).padStart(2, '0')}-
           {String(selectedDay).padStart(2, '0')}
@@ -194,34 +207,40 @@ const CalendarPage = ({
             selectedDayScenarios.map((s) => (
               <div
                 key={s.id}
-                className={`w-full text-left px-3 py-2.5 rounded-xl border ${
-                  theme.isDark ? 'border-slate-700 bg-slate-900/50' : 'border-slate-200 bg-slate-50'
+                className={`w-full text-left px-3 py-2.5 rounded-2xl border ${
+                  theme.isDark ? 'border-slate-700 bg-slate-900/55' : 'border-slate-200 bg-slate-50/80'
                 }`}
               >
-                <button
-                  type="button"
-                  onClick={() => onSelect?.(s.id, s.owner_user_id ?? null)}
-                  className="w-full text-left"
-                >
-                  <p className={`text-sm font-bold ${theme.textMain}`}>{s.name}</p>
-                  <p className={`text-[11px] mt-0.5 ${theme.textSub}`}>
-                    {new Date(s.trip_start_at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </button>
-                {s.access !== 'shared' ? (
+                <div className="flex items-start justify-between gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      setRescheduleTarget(s);
-                      setRescheduleValue(s.trip_start_at ? String(s.trip_start_at).slice(0, 16) : '');
-                    }}
-                    className={`mt-2 text-[11px] font-bold px-2.5 py-1 rounded-lg ${
-                      theme.isDark ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-600'
-                    }`}
+                    onClick={() => onSelect?.(s.id, s.owner_user_id ?? null)}
+                    className="flex-1 min-w-0 text-left"
                   >
-                    {t?.('calendarRescheduleBtn') || 'Change time'}
+                    <p className={`text-sm font-bold truncate ${theme.textMain}`}>{s.name}</p>
+                    <p className={`text-[11px] mt-0.5 ${theme.textSub}`}>
+                      {new Date(s.trip_start_at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
+                    </p>
                   </button>
-                ) : null}
+                  {s.access !== 'shared' ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRescheduleTarget(s);
+                        setRescheduleValue(s.trip_start_at ? String(s.trip_start_at).slice(0, 16) : '');
+                      }}
+                      className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+                        theme.isDark
+                          ? 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                          : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                      }`}
+                      aria-label={t?.('calendarRescheduleBtn') || 'Change time'}
+                      title={t?.('calendarRescheduleBtn') || 'Change time'}
+                    >
+                      <Clock3 size={13} />
+                    </button>
+                  ) : null}
+                </div>
               </div>
             ))
           ) : (
@@ -234,9 +253,22 @@ const CalendarPage = ({
           type="button"
           onClick={() => {
             const createDate = new Date(year, month, selectedDay, 9, 0, 0, 0);
+            const isTodaySelected =
+              year === now.getFullYear() &&
+              month === now.getMonth() &&
+              selectedDay === now.getDate();
+            if (isTodaySelected) {
+              // For today, avoid defaulting to a time that has already passed.
+              const safeNow = new Date(now.getTime() + 5 * 60 * 1000);
+              createDate.setHours(safeNow.getHours(), safeNow.getMinutes(), 0, 0);
+            }
+            if (createDate < now) {
+              window.alert(t?.('tripPastDateBlocked') || 'You cannot create a trip in the past.');
+              return;
+            }
             onCreateTripAtDate?.(createDate.toISOString());
           }}
-          className={`w-full mt-3 py-2.5 rounded-xl text-sm font-bold text-white ${theme.primary}`}
+          className={`w-full mt-3 py-3 rounded-2xl text-sm font-bold text-white shadow-sm ${theme.primary}`}
         >
           {t?.('calendarCreateTripOnDate') || 'Create trip on this date'}
         </button>
@@ -277,6 +309,10 @@ const CalendarPage = ({
                         0,
                         0,
                       );
+                      if (nextStart < now) {
+                        window.alert(t?.('tripPastDateBlocked') || 'You cannot create a trip in the past.');
+                        return;
+                      }
                       const prevEnd = trip.trip_end_at ? new Date(trip.trip_end_at) : null;
                       let nextEndIso = trip.trip_end_at || null;
                       if (prevEnd && prev && prevEnd < prev) nextEndIso = null;
@@ -360,6 +396,10 @@ const CalendarPage = ({
                 type="button"
                 disabled={rescheduleBusy || !rescheduleValue}
                 onClick={() => {
+                  if (!rescheduleValue || new Date(rescheduleValue) < now) {
+                    window.alert(t?.('tripPastDateBlocked') || 'You cannot create a trip in the past.');
+                    return;
+                  }
                   setRescheduleBusy(true);
                   void (async () => {
                     try {

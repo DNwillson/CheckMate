@@ -38,6 +38,15 @@ const WeatherGlyph = ({ iconKey, className = '' }) => {
   }
 };
 
+const getLocalDateKey = (dateLike = new Date()) => {
+  const d = new Date(dateLike);
+  if (Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
 const HomeDashboard = ({
   scenarios,
   onSelect,
@@ -81,7 +90,7 @@ const HomeDashboard = ({
   const hint =
     weather?.packingHint || (weatherLoading ? 'Fetching live forecast…' : 'Tap refresh to load weather.');
   const tempUnit = weather?.tempUnit || 'C';
-  const tipTargetDate = selectedWeatherTipDate || new Date().toISOString().slice(0, 10);
+  const tipTargetDate = selectedWeatherTipDate || getLocalDateKey();
   const tipDateLabel = useMemo(() => {
     try {
       return new Date(tipTargetDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -146,7 +155,7 @@ const HomeDashboard = ({
       if (out.some((x) => x.text.toLowerCase() === text.toLowerCase())) return;
       out.push({ text, critical, assignedTo: 'me' });
     };
-    const isTodaySelected = tipTargetDate === new Date().toISOString().slice(0, 10);
+    const isTodaySelected = tipTargetDate === getLocalDateKey();
     const uv = Number(selectedTipDayWeather?.uvIndexMax ?? weather?.uvIndex);
     const humidity = Number(isTodaySelected ? weather?.humidity : undefined);
     const wind = Number(isTodaySelected ? weather?.windKmh : undefined);
@@ -207,7 +216,7 @@ const HomeDashboard = ({
   }, [weatherPackingItems]);
 
   useEffect(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getLocalDateKey();
     if (!weatherTipDays.length) {
       setSelectedWeatherTipDate(today);
       return;

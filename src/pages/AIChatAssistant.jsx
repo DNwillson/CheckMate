@@ -137,15 +137,14 @@ const AIChatAssistant = ({
             gemini: 'Gemini',
           };
           if (s?.ai_provider) {
-            setStatusLine(`Forced provider: ${s.ai_provider}.`);
+            const forced = String(s.ai_provider).trim().toLowerCase();
+            setStatusLine(t('assistantCurrentAi').replace('{name}', labels[forced] || s.ai_provider));
           } else if (ids.length) {
             const order = (s.auto_order || []).filter((n) => ids.includes(n));
-            const names = order.map((n) => labels[n] || n);
-            setStatusLine(`Keys loaded: ${names.join(', ')}. Request order: ${names.join(' → ')}.`);
+            const current = order[0] || ids[0];
+            setStatusLine(t('assistantCurrentAi').replace('{name}', labels[current] || current));
           } else {
-            setStatusLine(
-              'No AI keys on server — offline hints only. Add MOONSHOT_API_KEY or DEEPSEEK_API_KEY in backend/.env (China-friendly), then restart Flask.',
-            );
+            setStatusLine(t('assistantNoKeyHint'));
           }
         } catch {
           setStatusLine('');
@@ -186,7 +185,7 @@ const AIChatAssistant = ({
   useEffect(() => {
     if (!isOpen) return;
     if (suggestedItems.length && !importTripName) {
-      setImportTripName(`Trip from AI ${new Date().toLocaleDateString()}`);
+      setImportTripName(t('aiImportDefaultTripName').replace('{date}', new Date().toLocaleDateString()));
     }
     if (editableScenarios.length && !importTargetId) {
       setImportTargetId(editableScenarios[0].id);
@@ -271,7 +270,7 @@ const AIChatAssistant = ({
       const hint = data?.hint;
       let full = reply;
       if (source === 'rules' && hint) {
-        full += `\n\n— Offline fallback (cloud error: ${hint})`;
+        full += `\n\n${t('assistantOfflineFallbackHint').replace('{hint}', hint)}`;
       }
       setMessages((prev) => [...prev, { role: 'bot', content: full }]);
     } catch {
@@ -308,8 +307,10 @@ const AIChatAssistant = ({
               <Bot size={24} />
             </div>
             <div>
-              <h3 className={`font-bold ${theme.textMain}`}>Packing assistant</h3>
-              <p className="text-[10px] text-gray-500 font-medium uppercase tracking-widest">Smart hints</p>
+              <h3 className={`font-bold ${theme.textMain}`}>{t('assistantTitle')}</h3>
+              <p className="text-[10px] text-gray-500 font-medium uppercase tracking-widest">
+                {t('assistantSmartHints')}
+              </p>
               {statusLine ? (
                 <p className="text-[10px] text-gray-400 mt-1 max-w-[220px] leading-snug">{statusLine}</p>
               ) : null}
@@ -341,7 +342,7 @@ const AIChatAssistant = ({
           {sending ? (
             <div className="flex justify-start">
               <div className="bg-gray-100 text-gray-500 text-xs font-medium px-4 py-2 rounded-2xl rounded-tl-none">
-                Thinking…
+                {t('assistantThinking')}
               </div>
             </div>
           ) : null}
@@ -501,7 +502,7 @@ const AIChatAssistant = ({
                   handleSend();
                 }
               }}
-              placeholder="Ask me anything…"
+              placeholder={t('askAnything')}
               disabled={sending}
               className="flex-1 px-4 outline-none text-sm bg-transparent disabled:opacity-50"
             />

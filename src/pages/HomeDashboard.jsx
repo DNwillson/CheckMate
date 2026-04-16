@@ -71,9 +71,9 @@ const HomeDashboard = ({
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
-    if (hour < 12) return t?.('greetingMorning') || 'Good Morning,';
-    if (hour < 18) return t?.('greetingAfternoon') || 'Good Afternoon,';
-    return t?.('greetingEvening') || 'Good Evening,';
+    if (hour < 12) return t?.('greetingMorning');
+    if (hour < 18) return t?.('greetingAfternoon');
+    return t?.('greetingEvening');
   }, [t]);
 
   const comfort = weather?.comfort || '—';
@@ -84,11 +84,10 @@ const HomeDashboard = ({
     if (source === 'open-meteo') return 'Open-Meteo';
     if (source === 'weatherapi') return 'WeatherAPI.com';
     if (source === 'tomorrowio') return 'Tomorrow.io';
-    if (source === 'system-fallback') return t?.('weatherSourceFallback') || 'System fallback';
-    return t?.('weatherSourceUnknown') || 'Source unavailable';
+    if (source === 'system-fallback') return t?.('weatherSourceFallback');
+    return t?.('weatherSourceUnknown');
   }, [weather?.source, t]);
-  const hint =
-    weather?.packingHint || (weatherLoading ? 'Fetching live forecast…' : 'Tap refresh to load weather.');
+  const hint = weather?.packingHint || (weatherLoading ? t?.('fetchingForecast') : t?.('tapRefreshWeather'));
   const tempUnit = weather?.tempUnit || 'C';
   const tipTargetDate = selectedWeatherTipDate || getLocalDateKey();
   const tipDateLabel = useMemo(() => {
@@ -111,23 +110,27 @@ const HomeDashboard = ({
       const parts = [];
       if (selectedTipDayWeather.condition) parts.push(selectedTipDayWeather.condition);
       if (selectedTipDayWeather.max != null || selectedTipDayWeather.min != null) {
-        parts.push(`High ${selectedTipDayWeather.max ?? '—'}° / Low ${selectedTipDayWeather.min ?? '—'}°`);
+        parts.push(
+          t?.('weatherSummaryHighLow')
+            .replace('{max}', String(selectedTipDayWeather.max ?? '—'))
+            .replace('{min}', String(selectedTipDayWeather.min ?? '—')),
+        );
       }
       if (selectedTipDayWeather.uvIndexMax != null) {
         parts.push(`UV ${selectedTipDayWeather.uvIndexMax}`);
       }
       if (selectedTipDayWeather.precipProbMax != null) {
-        parts.push(`Rain chance ${selectedTipDayWeather.precipProbMax}%`);
+        parts.push(t?.('weatherSummaryRainChance').replace('{value}', String(selectedTipDayWeather.precipProbMax)));
       }
-      return parts.length ? parts.join(' · ') : (t?.('weatherSmartTipsDesc') || 'Based on weather forecast.');
+      return parts.length ? parts.join(' · ') : t?.('weatherSmartTipsDesc');
     }
     const fallback = [];
     if (weather?.condition) fallback.push(weather.condition);
     if (weather?.temp != null) fallback.push(`${weather.temp}°${tempUnit}`);
-    if (weather?.windKmh != null) fallback.push(`Wind ${weather.windKmh} km/h`);
-    if (weather?.humidity != null) fallback.push(`Humidity ${weather.humidity}%`);
+    if (weather?.windKmh != null) fallback.push(t?.('weatherSummaryWind').replace('{value}', String(weather.windKmh)));
+    if (weather?.humidity != null) fallback.push(t?.('weatherSummaryHumidity').replace('{value}', String(weather.humidity)));
     if (weather?.uvIndex != null) fallback.push(`UV ${weather.uvIndex}`);
-    return fallback.length ? fallback.join(' · ') : (t?.('weatherSmartTipsDesc') || 'Based on weather forecast.');
+    return fallback.length ? fallback.join(' · ') : t?.('weatherSummaryBasedOnForecast');
   }, [selectedTipDayWeather, t, tempUnit, weather]);
   const myTrips = useMemo(
     () => scenarios.filter((s) => s.type === 'custom' && s.access !== 'shared' && !s.archived),
@@ -150,6 +153,27 @@ const HomeDashboard = ({
   }, [myTrips, tipTargetDate]);
   const weatherPackingItems = useMemo(() => {
     const out = [];
+    const isZh = (t?.('navHome') || '') === '首页';
+    const tip = {
+      sunscreen: isZh ? '防晒霜（SPF 30+）' : 'Sunscreen (SPF 30+)',
+      sunglasses: isZh ? '防紫外线太阳镜' : 'UV-protection sunglasses',
+      hat: isZh ? '帽子（棒球帽或遮阳帽）' : 'Cap or sun hat',
+      quickDry: isZh ? '速干上衣' : 'Quick-dry shirt',
+      towel: isZh ? '吸汗小毛巾' : 'Small absorbent towel',
+      windproof: isZh ? '防风外套' : 'Windproof outer layer',
+      midLayer: isZh ? '保暖中层（抓绒/卫衣）' : 'Warm mid-layer or fleece',
+      gloves: isZh ? '轻薄手套' : 'Light gloves',
+      scarf: isZh ? '薄围巾或脖套' : 'Light scarf or neck gaiter',
+      bottle: isZh ? '可重复使用水杯' : 'Reusable water bottle',
+      breathable: isZh ? '透气轻薄衣物' : 'Breathable light clothing',
+      sunSleeve: isZh ? '防晒外套/防晒袖' : 'Sun-protective layer',
+      umbrella: isZh ? '便携雨伞' : 'Compact umbrella',
+      raincoat: isZh ? '轻便雨衣' : 'Light rain jacket',
+      waterResistantShoes: isZh ? '防水或速干鞋' : 'Water-resistant or quick-dry shoes',
+      thermal: isZh ? '保暖打底层' : 'Thermal base layer',
+      warmSocks: isZh ? '保暖袜' : 'Warm socks',
+      tractionShoes: isZh ? '防滑鞋底鞋' : 'Shoes with good traction',
+    };
     const push = (text, critical = false) => {
       if (!text) return;
       if (out.some((x) => x.text.toLowerCase() === text.toLowerCase())) return;
@@ -163,32 +187,36 @@ const HomeDashboard = ({
     const code = Number(selectedTipDayWeather?.weatherCode ?? weather?.weatherCode);
 
     if (!Number.isNaN(uv) && uv >= 6) {
-      push('Sunscreen (SPF 30+)', true);
-      push('UV-protection sunglasses', false);
-      push('Cap or sun hat', false);
+      push(tip.sunscreen, true);
+      push(tip.sunglasses, false);
+      push(tip.hat, false);
     }
     if (!Number.isNaN(humidity) && humidity >= 80) {
-      push('Quick-dry shirt', false);
-      push('Small absorbent towel', false);
+      push(tip.quickDry, false);
+      push(tip.towel, false);
     }
     if (!Number.isNaN(wind) && wind >= 30) {
-      push('Windproof outer layer', false);
+      push(tip.windproof, false);
     }
     if (!Number.isNaN(temp) && temp <= 10) {
-      push('Warm mid-layer or fleece', true);
-      push('Light gloves', false);
+      push(tip.midLayer, true);
+      push(tip.gloves, false);
+      if (!Number.isNaN(wind) && wind >= 20) push(tip.scarf, false);
     }
     if (!Number.isNaN(temp) && temp >= 30) {
-      push('Reusable water bottle', true);
-      push('Breathable light clothing', false);
+      push(tip.bottle, true);
+      push(tip.breathable, false);
+      if (!Number.isNaN(uv) && uv >= 6) push(tip.sunSleeve, false);
     }
     if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) {
-      push('Compact umbrella', true);
-      push('Water-resistant pouch for phone', false);
+      push(tip.umbrella, true);
+      push(tip.raincoat, false);
+      push(tip.waterResistantShoes, false);
     }
     if ([71, 73, 75, 85, 86].includes(code)) {
-      push('Thermal base layer', true);
-      push('Warm socks', false);
+      push(tip.thermal, true);
+      push(tip.warmSocks, false);
+      push(tip.tractionShoes, false);
     }
     return out.slice(0, 6);
   }, [selectedTipDayWeather, tipTargetDate, weather]);
@@ -233,7 +261,7 @@ const HomeDashboard = ({
           <h1 className={`text-2xl font-bold ${theme.textMain} tracking-tight`}>
             {greeting}
             <br />
-            <span className={`${theme.primaryText} text-3xl`}>{t?.('whereToToday') || 'Where to today?'}</span>
+            <span className={`${theme.primaryText} text-3xl`}>{t?.('whereToToday')}</span>
           </h1>
         </div>
         <button
@@ -258,8 +286,8 @@ const HomeDashboard = ({
           }}
           disabled={weatherLoading}
           className="btn-secondary-soft absolute top-3 right-3 z-20 p-2.5 rounded-2xl text-slate-600 disabled:opacity-50"
-          title={t?.('refreshWeather') || 'Refresh weather'}
-          aria-label={t?.('refreshWeather') || 'Refresh weather'}
+          title={t?.('refreshWeather')}
+          aria-label={t?.('refreshWeather')}
         >
           <RefreshCw size={18} className={weatherLoading ? 'animate-spin' : ''} />
         </button>
@@ -276,7 +304,7 @@ const HomeDashboard = ({
             <div className="min-w-0 flex-1 space-y-1">
               <div className="flex items-center gap-1.5 text-sky-700/90 flex-wrap">
                 <MapPin size={14} className="shrink-0" strokeWidth={2.5} />
-                <span className="text-[11px] font-bold uppercase tracking-wider">{t?.('now') || 'Now'}</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider">{t?.('now')}</span>
                 <span
                   className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-bold tracking-wide uppercase border ${
                     theme.isDark
@@ -301,9 +329,15 @@ const HomeDashboard = ({
                 </span>
               </div>
               <p className={`text-xs font-semibold text-sky-800/70 pt-1`}>
-                {live && weather?.windKmh != null ? ` · Wind ${weather.windKmh} km/h` : ''}
-                {live && weather?.humidity != null ? ` · ${weather.humidity}% RH` : ''}
-                {live && weather?.isDay && weather?.uvIndex != null ? ` · UV ${weather.uvIndex}` : ''}
+                {live && weather?.windKmh != null
+                  ? ` · ${t?.('weatherSummaryWind').replace('{value}', String(weather.windKmh))}`
+                  : ''}
+                {live && weather?.humidity != null
+                  ? ` · ${t?.('weatherSummaryHumidity').replace('{value}', String(weather.humidity))}`
+                  : ''}
+                {live && weather?.isDay && weather?.uvIndex != null
+                  ? ` · ${t?.('weatherSummaryUv').replace('{value}', String(weather.uvIndex))}`
+                  : ''}
                 {!live && !weatherLoading ? ` · ${comfort}` : ''}
               </p>
             </div>
@@ -314,7 +348,7 @@ const HomeDashboard = ({
 
           {live ? (
             <div className="mt-3 flex items-center justify-between text-sky-900/50 px-0.5">
-              <span className="text-[11px] font-bold uppercase tracking-wider">{t?.('fullForecast') || 'Full forecast'}</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider">{t?.('fullForecast')}</span>
               <ChevronRight size={18} className="text-sky-700/40" />
             </div>
           ) : null}
@@ -330,10 +364,10 @@ const HomeDashboard = ({
 
       <div className={`rounded-xl p-3 border ${theme.isDark ? 'border-slate-700/60 bg-slate-900/40' : 'border-[#EFEFEF] bg-white'} shadow-sm`}>
         <div className="flex items-center justify-between mb-1.5">
-          <h3 className={`text-sm font-bold ${theme.textMain}`}>{t?.('weatherSmartTipsTitle') || 'Weather smart tips'}</h3>
+          <h3 className={`text-sm font-bold ${theme.textMain}`}>{t?.('weatherSmartTipsTitle')}</h3>
           <div className="flex items-center gap-2">
             <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${theme.primaryLight} ${theme.primaryText}`}>
-              {weatherPackingItems.length} {t?.('weatherItemsLabel') || 'items'}
+              {weatherPackingItems.length} {t?.('weatherItemsLabel')}
             </span>
             <button
               type="button"
@@ -342,7 +376,7 @@ const HomeDashboard = ({
                 theme.isDark ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-600'
               }`}
             >
-              {tipsExpanded ? (t?.('weatherTipsCollapse') || 'Hide') : (t?.('weatherTipsExpand') || 'Show')}
+              {tipsExpanded ? t?.('weatherTipsCollapse') : t?.('weatherTipsExpand')}
             </button>
           </div>
         </div>
@@ -375,7 +409,7 @@ const HomeDashboard = ({
                   })}
                 </div>
                 <p className={`text-[10px] mt-1 ${theme.textSub}`}>
-                  {`Tips for ${tipDateLabel}`}
+                  {t?.('weatherTipsForDate').replace('{date}', tipDateLabel)}
                 </p>
               </div>
             ) : null}
@@ -405,7 +439,7 @@ const HomeDashboard = ({
                       className="mt-0.5 h-3.5 w-3.5 rounded border-slate-300"
                     />
                     <span>
-                      {it.critical ? 'Must: ' : 'Tip: '}
+                      {it.critical ? t?.('weatherTipMustPrefix') : t?.('weatherTipOptionalPrefix')}
                       {it.text}
                     </span>
                   </label>
@@ -413,7 +447,7 @@ const HomeDashboard = ({
               </div>
             ) : (
               <p className={`text-[11px] ${theme.textSub} mb-2`}>
-                {t?.('weatherSmartNoExtra') || 'No extra weather-specific items suggested right now.'}
+                {t?.('weatherSmartNoExtra')}
               </p>
             )}
             {weatherPackingItems.length > 0 ? (
@@ -437,7 +471,7 @@ const HomeDashboard = ({
                     </option>
                   ))
                 ) : (
-                  <option value="">{t?.('weatherNoTripOption') || 'No trip scheduled for selected date'}</option>
+                  <option value="">{t?.('weatherNoTripOption')}</option>
                 )}
               </select>
               <button
@@ -454,9 +488,9 @@ const HomeDashboard = ({
                         items: selectedWeatherPackingItems,
                         tipDate: tipTargetDate,
                       });
-                      setWeatherAddMsg(t?.('weatherAddOk') || 'Added weather tips to your trip.');
+                      setWeatherAddMsg(t?.('weatherAddOk'));
                     } catch (e) {
-                      setWeatherAddMsg(e?.message || (t?.('weatherAddFail') || 'Could not add right now.'));
+                      setWeatherAddMsg(e?.message || t?.('weatherAddFail'));
                     } finally {
                       setWeatherAddBusy(false);
                     }
@@ -468,7 +502,7 @@ const HomeDashboard = ({
                     : `btn-primary-soft ${theme.primary} text-white`
                 }`}
               >
-                {t?.('weatherAddBtn') || 'Add to trip'}
+                {t?.('weatherAddBtn')}
               </button>
             </div>
             {weatherAddMsg ? <p className={`text-[11px] mt-2 ${theme.textSub}`}>{weatherAddMsg}</p> : null}
@@ -478,7 +512,7 @@ const HomeDashboard = ({
 
       <div>
         <div className="flex justify-between items-end mb-4">
-          <h2 className={`text-lg font-bold ${theme.textMain}`}>{t?.('myTrips') || 'My Trips'}</h2>
+          <h2 className={`text-lg font-bold ${theme.textMain}`}>{t?.('myTrips')}</h2>
         </div>
 
         {myTrips.length ? (
@@ -509,7 +543,7 @@ const HomeDashboard = ({
                           <img src={scenario.owner_avatar} alt="" className="w-4 h-4 rounded-full bg-white object-cover" />
                         ) : null}
                         <p className="text-[10px] font-bold text-sky-600 uppercase tracking-wide">
-                          {(t?.('fromUser') || 'From')} @{scenario.owner_username}
+                          {t?.('fromUser')} @{scenario.owner_username}
                         </p>
                       </div>
                     ) : null}
@@ -519,11 +553,13 @@ const HomeDashboard = ({
                           theme.isDark ? 'text-emerald-300' : 'text-emerald-600'
                         }`}
                       >
-                        {t?.('tripScheduledTag') || 'Scheduled'}
+                        {t?.('tripScheduledTag')}
                       </p>
                     ) : null}
                     <h3 className={`font-bold ${theme.textMain} text-lg`}>{scenario.name}</h3>
-                    <p className={`text-xs ${theme.textSub} mt-1 font-medium`}>{scenario.items.length} items</p>
+                    <p className={`text-xs ${theme.textSub} mt-1 font-medium`}>
+                      {scenario.items.length} {t?.('weatherItemsLabel')}
+                    </p>
                   </div>
 
                   <div className="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-all transform group-hover:translate-x-0 translate-x-2">
@@ -542,10 +578,10 @@ const HomeDashboard = ({
             }`}
           >
             <p className={`text-sm font-semibold ${theme.textMain}`}>
-              {t?.('myTripsEmptyTitle') || 'No trips created yet'}
+              {t?.('myTripsEmptyTitle')}
             </p>
             <p className={`text-xs mt-1 ${theme.textSub}`}>
-              {t?.('myTripsEmptyDesc') || 'Create your first trip to see it here.'}
+              {t?.('myTripsEmptyDesc')}
             </p>
           </div>
         )}

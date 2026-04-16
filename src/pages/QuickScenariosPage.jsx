@@ -73,7 +73,60 @@ const CATEGORY_META = [
   { id: 'study', label: 'Study' },
 ];
 
-const QuickScenariosPage = ({ scenarios, onCreateFromTemplate, theme, t }) => {
+const QUICK_NAME_ZH = {
+  'Daily commute': '通勤随身',
+  'Weekend short trip': '周末短途出行',
+  'Cafe work session': '咖啡馆办公',
+  'Rainy day outing': '雨天出行',
+  'Airport checklist': '机场出发清单',
+  'Office meeting day': '会议日',
+  'Doctor appointment': '就诊准备',
+  'Co-working day': '共享办公日',
+  'Quick business trip': '短途商务出差',
+  'Concert night': '演唱会出行',
+  'Gym training': '健身训练',
+  Running: '跑步',
+  Swimming: '游泳',
+  Hiking: '徒步',
+  Cycling: '骑行',
+  'Basketball game': '篮球训练',
+  'Badminton session': '羽毛球训练',
+  'Yoga class': '瑜伽课',
+  'Soccer practice': '足球训练',
+  'Tennis day': '网球训练',
+  'Beach day': '海边出行',
+  'City walk': '城市漫步',
+  'Shopping day': '购物出行',
+  'Photo outing': '摄影出行',
+  Picnic: '野餐',
+  'Museum day': '博物馆参观',
+  'Theme park day': '主题乐园出行',
+  'Road trip': '自驾游',
+  'Night market walk': '夜市逛逛',
+  'Date night': '约会出行',
+  'Parent-child park': '亲子公园',
+  'Family road trip': '家庭自驾游',
+  'School event day': '校园活动日',
+  'Baby outing': '宝宝出行',
+  'Family camping': '家庭露营',
+  'Family beach day': '家庭海边出行',
+  'Kids birthday party': '儿童生日派对',
+  'Family grocery run': '家庭采购日',
+  'Weekend grandparents visit': '周末探亲',
+  'Parent-teacher meeting': '家校沟通',
+  'School day': '上学准备',
+  'Library study': '图书馆学习',
+  'Exam day': '考试准备',
+  'Group presentation': '小组汇报',
+  'Language class': '语言课',
+  'Coding bootcamp': '编程集训',
+  'Online class setup': '线上课堂准备',
+  'Art class': '美术课',
+  'Science lab day': '实验课准备',
+  'Research interview day': '调研访谈',
+};
+
+const QuickScenariosPage = ({ scenarios, onCreateFromTemplate, theme, t, language = 'en' }) => {
   const quickScenarios = useMemo(
     () => scenarios.filter((s) => s.type !== 'custom' && !s.archived),
     [scenarios],
@@ -83,6 +136,9 @@ const QuickScenariosPage = ({ scenarios, onCreateFromTemplate, theme, t }) => {
 
   const categoryLabel = (id, fallback) =>
     t?.(`quickCategory${id[0].toUpperCase()}${id.slice(1)}`) || fallback;
+  // Keep item texts in English across languages; only localize card titles.
+  const localizeScenarioName = (name) =>
+    language === 'zh' ? (QUICK_NAME_ZH[name] || name) : name;
 
   return (
     <div className="p-6 pb-28 space-y-5 animate-fade-in">
@@ -119,6 +175,7 @@ const QuickScenariosPage = ({ scenarios, onCreateFromTemplate, theme, t }) => {
           {selectedTemplates.map((tpl, idx) => {
             const scenario = {
               ...tpl,
+              name: localizeScenarioName(tpl.name),
               id: `tpl-${activeCategory}-${idx}`,
               theme: tpl.theme || { bg: 'bg-[#F5F5F5]', text: 'text-[#9A9A9A]' },
               items: tpl.items || [],

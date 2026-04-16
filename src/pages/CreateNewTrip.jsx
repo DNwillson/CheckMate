@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, AlertCircle, Circle } from 'lucide-react';
+import { uiT } from '../uiCopy';
 
 const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = 'en' }) => {
+  const t = uiT(language);
   const [name, setName] = useState('');
   const [tripStartAt, setTripStartAt] = useState('');
   const [tripEndAt, setTripEndAt] = useState('');
@@ -50,11 +52,11 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
   const handleSave = async () => {
     if (!name || items.length === 0) return;
     if (tripStartAt && new Date(tripStartAt) < new Date()) {
-      window.alert('Trip start time cannot be in the past.');
+      window.alert(t('tripStartPastError'));
       return;
     }
     if (tripStartAt && tripEndAt && new Date(tripEndAt) < new Date(tripStartAt)) {
-      window.alert('Trip end time must be after start time.');
+      window.alert(t('tripEndBeforeStartError'));
       return;
     }
     const payload = {
@@ -76,34 +78,34 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
     <div className={`min-h-screen ${theme.bg} flex flex-col`}>
       <div className={`sticky top-0 z-20 ${theme.bg}/90 backdrop-blur-md px-4 h-16 flex items-center justify-between border-b border-[#F0F0F0]`}>
         <button type="button" onClick={onBack} className="text-[#9A9A9A] font-medium">
-          Cancel
+          {t('commonCancel')}
         </button>
-        <span className={`font-bold ${theme.textMain}`}>New Trip</span>
+        <span className={`font-bold ${theme.textMain}`}>{t('createTripTitle')}</span>
         <button
           type="button"
           onClick={handleSave}
           disabled={!name || items.length === 0}
           className={`font-bold ${!name || items.length === 0 ? 'text-[#D1D1D1]' : theme.primaryText}`}
         >
-          Save
+          {t('commonSave')}
         </button>
       </div>
       <div className="p-6 space-y-8 pb-32 overflow-y-auto">
         <div>
-          <label className={`block text-xs font-bold ${theme.textSub} mb-3 ml-1`}>Name</label>
+          <label className={`block text-xs font-bold ${theme.textSub} mb-3 ml-1`}>{t('tripNameLabel')}</label>
           <input
             type="text"
-            placeholder="e.g., Beach trip…"
+            placeholder={t('tripNamePlaceholder')}
             className={`input-soft w-full text-xl py-3 px-4 ${theme.cardBg} ${theme.textMain} placeholder-[#D1D1D1]`}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
         </div>
         <div>
-          <label className={`block text-xs font-bold ${theme.textSub} mb-3 ml-1`}>Trip date & time</label>
+          <label className={`block text-xs font-bold ${theme.textSub} mb-3 ml-1`}>{t('tripDateTimeLabel')}</label>
           <div className="grid grid-cols-1 gap-3">
             <div>
-              <p className={`text-[11px] ${theme.textSub} mb-1.5`}>Start</p>
+              <p className={`text-[11px] ${theme.textSub} mb-1.5`}>{t('tripDateStart')}</p>
               <input
                 type="datetime-local"
                 lang={inputLocale}
@@ -114,7 +116,7 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
               />
             </div>
             <div>
-              <p className={`text-[11px] ${theme.textSub} mb-1.5`}>End (optional)</p>
+              <p className={`text-[11px] ${theme.textSub} mb-1.5`}>{t('tripDateEndOptional')}</p>
               <input
                 type="datetime-local"
                 lang={inputLocale}
@@ -127,20 +129,20 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
           </div>
         </div>
         <div>
-          <label className={`block text-xs font-bold ${theme.textSub} mb-3 ml-1`}>Checklist</label>
+          <label className={`block text-xs font-bold ${theme.textSub} mb-3 ml-1`}>{t('tripChecklistLabel')}</label>
 
           <div className={`${theme.cardBg} rounded-2xl p-4 shadow-sm border ${theme.isDark ? 'border-slate-700/60' : 'border-[#F3F3F3]'} space-y-3`}>
             <div className="flex items-center justify-between">
               <p className={`text-sm font-bold ${theme.textMain} flex items-center gap-1.5`}>
                 <AlertCircle size={14} className={theme.isDark ? 'text-rose-300' : 'text-[#D98282]'} />
-                Must bring
+                {t('tripMustBring')}
               </p>
-              <span className={`text-[11px] ${theme.textSub}`}>{criticalItems.length} items</span>
+              <span className={`text-[11px] ${theme.textSub}`}>{t('tripItemsCount').replace('{count}', String(criticalItems.length))}</span>
             </div>
             <div className={`rounded-xl border px-2 py-1.5 flex items-center ${theme.isDark ? 'border-slate-600 bg-slate-900/60' : 'border-[#EAEAEA] bg-white'}`}>
               <input
                 type="text"
-                placeholder="Add must-bring item…"
+                placeholder={t('tripAddMustPlaceholder')}
                 className={`flex-1 bg-transparent px-2 outline-none text-sm ${theme.textMain}`}
                 value={criticalInput}
                 onChange={(e) => setCriticalInput(e.target.value)}
@@ -161,14 +163,14 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
             <div className="flex items-center justify-between">
               <p className={`text-sm font-bold ${theme.textMain} flex items-center gap-1.5`}>
                 <Circle size={13} className={theme.isDark ? 'text-slate-300' : 'text-[#9A9A9A]'} />
-                Optional
+                {t('tripOptional')}
               </p>
-              <span className={`text-[11px] ${theme.textSub}`}>{optionalItems.length} items</span>
+              <span className={`text-[11px] ${theme.textSub}`}>{t('tripItemsCount').replace('{count}', String(optionalItems.length))}</span>
             </div>
             <div className={`rounded-xl border px-2 py-1.5 flex items-center ${theme.isDark ? 'border-slate-600 bg-slate-900/60' : 'border-[#EAEAEA] bg-white'}`}>
               <input
                 type="text"
-                placeholder="Add optional item…"
+                placeholder={t('tripAddOptionalPlaceholder')}
                 className={`flex-1 bg-transparent px-2 outline-none text-sm ${theme.textMain}`}
                 value={optionalInput}
                 onChange={(e) => setOptionalInput(e.target.value)}
@@ -194,7 +196,7 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
                 <div className="min-w-0">
                   <p className={`${theme.textMain} text-sm font-semibold truncate`}>{item.text}</p>
                   <p className={`text-[11px] ${item.critical ? (theme.isDark ? 'text-rose-300' : 'text-[#D98282]') : theme.textSub}`}>
-                    {item.critical ? 'Must bring' : 'Optional'}
+                    {item.critical ? t('tripMustBring') : t('tripOptional')}
                   </p>
                 </div>
                 <button

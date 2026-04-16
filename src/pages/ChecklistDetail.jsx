@@ -42,13 +42,14 @@ const CheckItem = ({
   onAssignClick,
   theme,
   meUser,
+  t,
   canAssign,
   readOnly,
 }) => {
   const isCritical = type === 'critical';
   const hasCollaborators = collaborators && collaborators.length > 0;
   let assigneeAvatar = meUser.avatar;
-  let assigneeName = meUser.name || 'Me';
+  let assigneeName = meUser.name || t?.('navMe');
 
   if (item.assignedTo && item.assignedTo !== 'me') {
     const friend = friends?.find((f) => f.id === item.assignedTo);
@@ -104,7 +105,9 @@ const CheckItem = ({
           </span>
           <div className="flex items-center mt-1.5 flex-wrap gap-1.5">
             {isCritical && !checked && (
-              <span className={`text-[10px] font-bold ${theme.danger} px-2 py-0.5 rounded-md`}>Must bring</span>
+              <span className={`text-[10px] font-bold ${theme.danger} px-2 py-0.5 rounded-md`}>
+                {t?.('tripMustBring')}
+              </span>
             )}
             {item.assignedTo && hasCollaborators && (
               <span
@@ -121,7 +124,7 @@ const CheckItem = ({
       {canAssign && !readOnly ? (
         <button
           type="button"
-          aria-label="Assign item"
+          aria-label={t?.('assignItem')}
           onClick={(e) => {
             e.stopPropagation();
             onAssignClick();
@@ -372,8 +375,8 @@ const ChecklistDetail = ({
                   className={`w-10 h-10 flex items-center justify-center rounded-full shadow-sm ${
                     theme.isDark ? 'bg-slate-800 text-sky-300' : 'bg-white text-sky-600'
                   }`}
-                  aria-label="Share with account"
-                  title="Share with friend account"
+                  aria-label={t?.('share')}
+                  title={t?.('share')}
                 >
                   <Link2 size={18} />
                 </button>
@@ -384,8 +387,8 @@ const ChecklistDetail = ({
                 className={`relative w-10 h-10 flex items-center justify-center rounded-full shadow-sm ${
                   theme.isDark ? 'bg-slate-800' : 'bg-white'
                 }`}
-                aria-label="Invite on this list"
-                title="Invite for assigning items"
+                aria-label={t?.('peopleOnThisList')}
+                title={t?.('peopleOnThisList')}
               >
                 {(scenario.collaborators?.length || 0) > 0 ? (
                   <div className="flex -space-x-2">
@@ -417,7 +420,7 @@ const ChecklistDetail = ({
             {scenario.owner_avatar ? (
               <img src={scenario.owner_avatar} alt="" className="w-5 h-5 rounded-full bg-white object-cover" />
             ) : null}
-            <span>View only · shared by @{scenario.owner_username || 'friend'}</span>
+            <span>{t?.('viewOnlyHint')} · @{scenario.owner_username || t?.('friendLabel')}</span>
           </div>
         </div>
       ) : null}
@@ -428,7 +431,7 @@ const ChecklistDetail = ({
             theme.isDark ? 'bg-violet-950/35 text-violet-100 border border-violet-800/50' : 'bg-violet-50 text-violet-950 border border-violet-100'
           }`}
         >
-          <p className="font-bold mb-2">Shared for view-only (account)</p>
+          <p className="font-bold mb-2">{t?.('viewOnlyHint')}</p>
           <ul className="space-y-2">
             {scenario.share_recipients.map((r) => (
               <li key={r.username} className="flex items-center justify-between gap-2">
@@ -443,7 +446,7 @@ const ChecklistDetail = ({
                       try {
                         await onUnshareScenario(scenario.id, r.username);
                       } catch (err) {
-                        window.alert(err?.message || 'Could not revoke share.');
+                        window.alert(err?.message || t?.('couldNotRevokeShare'));
                       }
                     })();
                   }}
@@ -451,7 +454,7 @@ const ChecklistDetail = ({
                     theme.isDark ? 'bg-rose-950/60 text-rose-200' : 'bg-white text-rose-700 border border-rose-100'
                   }`}
                 >
-                  Revoke
+                  {t?.('revoke')}
                 </button>
               </li>
             ))}
@@ -498,11 +501,11 @@ const ChecklistDetail = ({
             theme.isDark ? 'bg-slate-800 text-slate-300' : 'text-[#9A9A9A] bg-white shadow-sm'
           }`}
         >
-          Packed {checkedCount} / {totalCount}
+          {t?.('packedProgress').replace('{checked}', String(checkedCount)).replace('{total}', String(totalCount))}
         </p>
         {canAssign ? (
           <p className={`text-[11px] ${theme.textSub} mt-2 text-center max-w-[240px]`}>
-            Tap the avatar on the right of a row to choose who packs that item.
+            {t?.('assignHint')}
           </p>
         ) : null}
       </div>
@@ -513,7 +516,7 @@ const ChecklistDetail = ({
             <h3
               className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 ml-1 ${theme.danger}`}
             >
-              <AlertCircle size={13} className="shrink-0" /> Critical
+              <AlertCircle size={13} className="shrink-0" /> {t?.('criticalLabel')}
             </h3>
             <div className={listShell}>
               {criticalItems.map((item) => (
@@ -528,6 +531,7 @@ const ChecklistDetail = ({
                   onAssignClick={() => setAssigningItem(item)}
                   theme={theme}
                   meUser={me}
+                  t={t}
                   canAssign={canAssign}
                   readOnly={readOnly}
                 />
@@ -536,7 +540,7 @@ const ChecklistDetail = ({
           </div>
         ) : null}
         <div className="space-y-2">
-          <h3 className={`text-[11px] font-bold uppercase tracking-wider ml-1 ${theme.textSub}`}>Everything else</h3>
+          <h3 className={`text-[11px] font-bold uppercase tracking-wider ml-1 ${theme.textSub}`}>{t?.('normalLabel')}</h3>
           <div className={listShell}>
             {finalItems
               .filter((i) => !i.critical)
@@ -552,6 +556,7 @@ const ChecklistDetail = ({
                   onAssignClick={() => setAssigningItem(item)}
                   theme={theme}
                   meUser={me}
+                  t={t}
                   canAssign={canAssign}
                   readOnly={readOnly}
                 />
@@ -578,14 +583,14 @@ const ChecklistDetail = ({
                     : 'bg-[#EAEAEA] text-[#C0C0C0] cursor-not-allowed shadow-none'
               }`}
             >
-              <span>{isReady ? "All packed — let's go!" : 'Finish critical items first'}</span>
+              <span>{isReady ? t?.('finishReady') : t?.('finishNeedCritical')}</span>
               {isReady ? <Smile size={22} /> : null}
             </button>
           </div>
         </>
       ) : (
         <div className={`px-6 pb-10 pt-2 text-center text-sm ${theme.textSub}`}>
-          Only the owner can check off items. This copy is for reference.
+          {t?.('viewOnlyHint')}
         </div>
       )}
 
@@ -596,21 +601,21 @@ const ChecklistDetail = ({
               theme.isDark ? 'border-slate-600' : 'border-gray-100'
             }`}
           >
-            <h3 className={`text-lg font-bold ${theme.textMain} mb-1`}>Share on server</h3>
+            <h3 className={`text-lg font-bold ${theme.textMain} mb-1`}>{t?.('shareOnServer')}</h3>
             <p className={`text-xs ${theme.textSub} mb-4`}>
-              Enter your friend&apos;s Checkmate login name. They must accept your friend request first.
+              {t?.('shareOnServerHint')}
             </p>
-            <label className={`text-xs font-bold ${theme.textSub}`}>Username</label>
+            <label className={`text-xs font-bold ${theme.textSub}`}>{t?.('username')}</label>
             <input
               value={shareUsername}
               onChange={(e) => setShareUsername(e.target.value.toLowerCase())}
-              placeholder="e.g. alex_travels"
+              placeholder={t?.('shareUsernamePlaceholder')}
               className={`input-soft mt-1 w-full px-3 py-2.5 text-sm mb-2 outline-none ${
                 theme.isDark ? 'bg-slate-900 border-slate-600 text-slate-100' : 'border-gray-200'
               }`}
             />
             {lookupBusy ? (
-              <p className={`text-[11px] mb-2 ${theme.textSub}`}>Checking username…</p>
+              <p className={`text-[11px] mb-2 ${theme.textSub}`}>{t?.('checkingUsername')}</p>
             ) : null}
             {!lookupBusy && lookupPreview?.ok && lookupPreview.user ? (
               <div
@@ -630,11 +635,11 @@ const ChecklistDetail = ({
               </div>
             ) : null}
             {!lookupBusy && lookupPreview && lookupPreview.ok === false ? (
-              <p className="text-[11px] text-amber-700 dark:text-amber-300 mb-2">No account with that username.</p>
+              <p className="text-[11px] text-amber-700 dark:text-amber-300 mb-2">{t?.('noAccountWithUsername')}</p>
             ) : null}
             {friends.some((f) => f.is_registered) ? (
               <div className="mb-3">
-                <p className={`text-[10px] font-bold ${theme.textSub} uppercase mb-1`}>Your friends</p>
+                <p className={`text-[10px] font-bold ${theme.textSub} uppercase mb-1`}>{t?.('yourFriends')}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {friends
                     .filter((f) => f.is_registered)
@@ -662,7 +667,7 @@ const ChecklistDetail = ({
                   theme.isDark ? 'bg-slate-800 text-slate-200' : 'bg-gray-100 text-gray-600'
                 }`}
               >
-                Cancel
+                {t?.('commonCancel')}
               </button>
               <button
                 type="button"
@@ -671,7 +676,7 @@ const ChecklistDetail = ({
                   void (async () => {
                     const u = shareUsername.trim().toLowerCase();
                     if (!u) {
-                      setShareError('Enter a username.');
+                      setShareError(t?.('enterUsername'));
                       return;
                     }
                     setShareBusy(true);
@@ -680,7 +685,7 @@ const ChecklistDetail = ({
                       await onShareScenario(scenario.id, u);
                       setShowShareModal(false);
                     } catch (err) {
-                      setShareError(err?.message || 'Could not share.');
+                      setShareError(err?.message || t?.('couldNotShare'));
                     } finally {
                       setShareBusy(false);
                     }
@@ -688,7 +693,7 @@ const ChecklistDetail = ({
                 }}
                 className={`btn-primary-soft flex-1 py-2.5 rounded-xl text-sm font-bold text-white ${theme.primary} disabled:opacity-50`}
               >
-                Share
+                {t?.('share')}
               </button>
             </div>
           </div>
@@ -702,14 +707,14 @@ const ChecklistDetail = ({
               theme.isDark ? 'border-slate-600' : 'border-gray-100'
             }`}
           >
-            <h3 className={`text-xl font-bold ${theme.textMain} mb-1`}>People on this list</h3>
+            <h3 className={`text-xl font-bold ${theme.textMain} mb-1`}>{t?.('peopleOnThisList')}</h3>
             <p className={`text-sm ${theme.textSub} mb-5`}>
-              Invite friends from your list, then assign items to them.
+              {t?.('peopleOnThisListHint')}
             </p>
             <div className="space-y-2">
               {friends.length === 0 ? (
                 <p className={`text-sm ${theme.textSub} py-4 text-center`}>
-                  Add friends under the Me tab first, then come back here.
+                  {t?.('addFriendsFirst')}
                 </p>
               ) : (
                 friends.map((friend) => {
@@ -735,7 +740,7 @@ const ChecklistDetail = ({
                               : 'bg-[#FADCDC] text-[#B85C5C]'
                           }`}
                         >
-                          <UserMinus size={14} /> Remove
+                          <UserMinus size={14} /> {t?.('remove')}
                         </button>
                       ) : (
                         <button
@@ -743,7 +748,7 @@ const ChecklistDetail = ({
                           onClick={() => handleAddFriend(friend.id)}
                           className={`btn-secondary-soft shrink-0 px-4 py-2 rounded-xl text-xs font-bold ${theme.accentGreen} text-[#7A9E83]`}
                         >
-                          Add
+                          {t?.('add')}
                         </button>
                       )}
                     </div>
@@ -758,7 +763,7 @@ const ChecklistDetail = ({
                 theme.isDark ? 'bg-slate-800 text-slate-300' : 'bg-[#F5F5F5] text-[#9A9A9A]'
               }`}
             >
-              Done
+              {t?.('done')}
             </button>
           </div>
         </div>
@@ -773,7 +778,7 @@ const ChecklistDetail = ({
           >
             <div className="flex justify-between items-start gap-3 mb-6">
               <div className="min-w-0">
-                <h3 className={`text-lg font-bold ${theme.textMain}`}>Who packs this?</h3>
+                <h3 className={`text-lg font-bold ${theme.textMain}`}>{t?.('whoPacksThis')}</h3>
                 <p className={`text-sm ${theme.textSub} mt-1 line-clamp-3`}>{assigningItem.text}</p>
               </div>
               <button
@@ -787,7 +792,7 @@ const ChecklistDetail = ({
             {(scenario.collaborators?.length || 0) === 0 && (friends?.length || 0) > 0 ? (
               <p className={`text-xs ${theme.textSub} mb-4 flex items-start gap-2`}>
                 <UserCircle2 size={16} className="shrink-0 mt-0.5" />
-                Add people to this trip via the share button first — then you can assign items to them.
+                {t?.('addPeopleBeforeAssign')}
               </p>
             ) : null}
             <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">

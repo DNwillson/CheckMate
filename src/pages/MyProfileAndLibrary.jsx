@@ -25,6 +25,7 @@ const LibraryItem = ({
   onDelete,
   isCustom,
   theme,
+  t,
   selectionMode = false,
   isSelected = false,
   onToggleSelect,
@@ -86,7 +87,7 @@ const LibraryItem = ({
               <img src={scenario.owner_avatar} alt="" className="w-4 h-4 rounded-full bg-white object-cover" />
             ) : null}
             <p className="text-[10px] font-bold text-sky-600 uppercase tracking-wide">
-              Shared · @{scenario.owner_username}
+              {(t?.('sharedBy') || 'Shared by')} @{scenario.owner_username}
             </p>
           </div>
         ) : null}
@@ -99,7 +100,7 @@ const LibraryItem = ({
       {showDelete && !selectionMode ? (
         <button
           type="button"
-          aria-label="Delete trip"
+          aria-label={t?.('deleteTripConfirmTitle') || 'Delete trip'}
           onClick={(e) => {
             e.stopPropagation();
             onDelete(scenario.id);
@@ -156,6 +157,7 @@ const MyProfileAndLibrary = ({
   onReuseHistoryTrip,
   initialSegment,
   theme,
+  t,
 }) => {
   const [activeSegment, setActiveSegment] = useState('scenarios');
   const [deleteId, setDeleteId] = useState(null);
@@ -282,11 +284,11 @@ const MyProfileAndLibrary = ({
 
   const segmentItems = useMemo(
     () => [
-      { id: 'scenarios', label: 'Trips', Icon: LayoutGrid },
-      { id: 'history', label: 'History', Icon: History },
-      { id: 'friends', label: 'Friends', Icon: Users },
+      { id: 'scenarios', label: t?.('segmentTrips') || 'Trips', Icon: LayoutGrid },
+      { id: 'history', label: t?.('segmentHistory') || 'History', Icon: History },
+      { id: 'friends', label: t?.('segmentFriends') || 'Friends', Icon: Users },
     ],
-    [],
+    [t],
   );
 
   const confirmDelete = async () => {
@@ -297,13 +299,14 @@ const MyProfileAndLibrary = ({
       await onDeleteFriend(deleteId);
       setDeleteId(null);
     } catch (e) {
-      setDeleteError(e?.message || 'Could not delete.');
+      setDeleteError(e?.message || t?.('requestFailed') || 'Could not delete.');
     } finally {
       setBusy(false);
     }
   };
 
   const panelClass = theme.isDark ? 'border-slate-700/60 bg-slate-900/40' : 'border-[#F2F2F2] bg-[#FDFDFD]';
+  const isZh = (t?.('navHome') || '') === '首页';
 
   const toggleTripSelected = useCallback((id) => {
     setSelectedTripIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -340,8 +343,16 @@ const MyProfileAndLibrary = ({
       <div className={`pt-10 pb-4 px-6 ${theme.bg} sticky top-0 z-10 ${theme.isDark ? 'border-b border-slate-800/50' : ''}`}>
         <div className="flex items-end justify-between gap-3 mb-5">
           <div>
-            <p className={`text-xs font-semibold uppercase tracking-widest ${theme.textSub} mb-1`}>Library</p>
-            <h1 className={`text-2xl font-bold ${theme.textMain}`}>Me</h1>
+            <h1 className={`text-2xl font-bold ${theme.textMain} leading-tight`}>
+              {t?.('myLibraryTitle') || 'Me'}
+            </h1>
+            <p
+              className={`mt-1 text-sm font-medium ${
+                theme.textSub
+              } ${isZh ? 'tracking-normal' : 'uppercase tracking-wider text-xs'}`}
+            >
+              {t?.('myLibrarySubtitle') || 'Library'}
+            </p>
           </div>
         </div>
         <Segment active={activeSegment} onSelect={setActiveSegment} theme={theme} items={segmentItems} />
@@ -352,7 +363,7 @@ const MyProfileAndLibrary = ({
           <div className="space-y-8 animate-fade-in">
             <div>
               <div className="flex justify-between items-center mb-3">
-                <h3 className={`text-xs font-bold ${theme.textSub} uppercase tracking-wider`}>Your trips</h3>
+              <h3 className={`text-xs font-bold ${theme.textSub} uppercase tracking-wider`}>{t?.('yourTripsTitle') || 'Your trips'}</h3>
                 <div className="flex items-center gap-2">
                   {deletableCustomScenarios.length > 0 ? (
                     <button
@@ -375,7 +386,7 @@ const MyProfileAndLibrary = ({
                             : 'bg-[#EFEFEF] text-[#666]'
                       }`}
                     >
-                      {selectMode ? 'Cancel' : 'Select'}
+                      {selectMode ? (t?.('commonCancel') || 'Cancel') : (t?.('select') || 'Select')}
                     </button>
                   ) : null}
                   <button
@@ -383,7 +394,7 @@ const MyProfileAndLibrary = ({
                     onClick={onCreateClick}
                     className={`btn-secondary-soft ${theme.primaryLight} ${theme.primaryText} px-3 py-1.5 rounded-lg text-xs font-bold`}
                   >
-                    + New trip
+                    {t?.('newTripBtn') || '+ New trip'}
                   </button>
                 </div>
               </div>
@@ -394,7 +405,9 @@ const MyProfileAndLibrary = ({
                   }`}
                 >
                   <p className={`text-xs font-medium ${theme.textSub}`}>
-                    Selected {selectedTripIds.length} / {deletableCustomScenarios.length}
+                    {(t?.('selectedCount') || 'Selected {selected} / {total}')
+                      .replace('{selected}', String(selectedTripIds.length))
+                      .replace('{total}', String(deletableCustomScenarios.length))}
                   </p>
                   <button
                     type="button"
@@ -403,9 +416,9 @@ const MyProfileAndLibrary = ({
                       if (selectedTripIds.length === 0) return;
                       setConfirmDialog({
                         type: 'deleteSelectedTrips',
-                        title: 'Delete selected trips?',
-                        message: `Delete ${selectedTripIds.length} selected trips? This action cannot be undone.`,
-                        confirmLabel: 'Delete',
+                        title: t?.('deleteSelectedConfirmTitle') || 'Delete selected trips?',
+                        message: (t?.('deleteSelectedConfirmMsg') || 'Delete {count} selected trips? This action cannot be undone.').replace('{count}', String(selectedTripIds.length)),
+                        confirmLabel: t?.('deleteAccount') || 'Delete',
                         tripIds: selectedTripIds,
                       });
                     }}
@@ -415,7 +428,7 @@ const MyProfileAndLibrary = ({
                         : 'btn-danger-soft'
                     }`}
                   >
-                    Delete selected
+                    {t?.('deleteSelected') || 'Delete selected'}
                   </button>
                 </div>
               ) : null}
@@ -429,14 +442,15 @@ const MyProfileAndLibrary = ({
                       onDelete={(scenarioId) => {
                         setConfirmDialog({
                           type: 'deleteTrip',
-                          title: 'Delete this trip?',
-                          message: 'This action cannot be undone.',
-                          confirmLabel: 'Delete',
+                          title: t?.('deleteTripConfirmTitle') || 'Delete this trip?',
+                          message: t?.('cannotUndo') || 'This action cannot be undone.',
+                          confirmLabel: t?.('deleteAccount') || 'Delete',
                           tripId: scenarioId,
                         });
                       }}
                       isCustom
                       theme={theme}
+                      t={t}
                       selectionMode={selectMode}
                       isSelected={selectedTripIds.includes(s.id)}
                       onToggleSelect={toggleTripSelected}
@@ -458,13 +472,13 @@ const MyProfileAndLibrary = ({
                   >
                     <Plus size={20} className={theme.textSub} />
                   </div>
-                  <p className={`text-sm font-semibold ${theme.textMain}`}>Create a custom trip</p>
-                  <p className={`text-xs ${theme.textSub} mt-1`}>Build your own packing list from scratch.</p>
+                  <p className={`text-sm font-semibold ${theme.textMain}`}>{t?.('createCustomTripTitle') || 'Create a custom trip'}</p>
+                  <p className={`text-xs ${theme.textSub} mt-1`}>{t?.('createCustomTripDesc') || 'Build your own packing list from scratch.'}</p>
                 </button>
               )}
             </div>
             <div>
-              <h3 className={`text-xs font-bold ${theme.textSub} uppercase tracking-wider mb-3`}>Frequently used</h3>
+              <h3 className={`text-xs font-bold ${theme.textSub} uppercase tracking-wider mb-3`}>{t?.('frequentlyUsed') || 'Frequently used'}</h3>
               {frequentScenarios.length > 0 ? (
                 <div className="space-y-2.5">
                   {frequentScenarios.map((s) => (
@@ -473,14 +487,15 @@ const MyProfileAndLibrary = ({
                       scenario={s}
                       onSelect={onSelect}
                       theme={theme}
+                      t={t}
                     />
                   ))}
                 </div>
               ) : (
                 <div className={`text-center py-8 px-4 rounded-2xl ${theme.cardBg} border ${panelClass}`}>
-                  <p className={`text-sm font-medium ${theme.textMain}`}>No frequent trips yet</p>
+                  <p className={`text-sm font-medium ${theme.textMain}`}>{t?.('noFrequentTrips') || 'No frequent trips yet'}</p>
                   <p className={`text-xs ${theme.textSub} mt-1`}>
-                    Finish packing a few trips and your frequently used scenarios will appear here.
+                    {t?.('noFrequentTripsDesc') || 'Finish packing a few trips and your frequently used scenarios will appear here.'}
                   </p>
                 </div>
               )}
@@ -496,24 +511,24 @@ const MyProfileAndLibrary = ({
                   onClick={() => {
                     setConfirmDialog({
                       type: 'clearHistory',
-                      title: 'Clear all history?',
-                      message: 'Delete all packing history on this account? This action cannot be undone.',
-                      confirmLabel: 'Clear all',
+                      title: t?.('clearHistoryTitle') || 'Clear all history?',
+                      message: t?.('clearHistoryMsg') || 'Delete all packing history on this account? This action cannot be undone.',
+                      confirmLabel: t?.('clearAll') || 'Clear all',
                     });
                   }}
                   className={`text-[11px] font-bold px-3 py-1.5 rounded-xl ${
                     theme.isDark ? 'bg-rose-950/50 text-rose-200' : 'bg-[#FADCDC] text-[#B85C5C]'
                   } disabled:opacity-50`}
                 >
-                  Clear all
+                  {t?.('clearAll') || 'Clear all'}
                 </button>
               </div>
             ) : null}
             {(history || []).length === 0 ? (
               <div className={`text-center py-14 px-4 rounded-2xl ${theme.cardBg} border ${panelClass}`}>
                 <History className={`mx-auto mb-3 ${theme.textSub}`} size={32} />
-                <p className={`text-sm font-medium ${theme.textMain}`}>No history yet</p>
-                <p className={`text-xs ${theme.textSub} mt-1`}>Finish packing a list to see it here.</p>
+                <p className={`text-sm font-medium ${theme.textMain}`}>{t?.('noHistoryYet') || 'No history yet'}</p>
+                <p className={`text-xs ${theme.textSub} mt-1`}>{t?.('noHistoryHint') || 'Finish packing a list to see it here.'}</p>
               </div>
             ) : (
               (history || []).map((record) => (
@@ -540,7 +555,7 @@ const MyProfileAndLibrary = ({
                         theme.isDark ? 'bg-slate-800 text-slate-400' : 'bg-[#F5F5F5] text-[#9A9A9A]'
                       }`}
                     >
-                      Done
+                      {t?.('doneTag') || 'Done'}
                     </span>
                     {record.scenario_id ? (
                       <button
@@ -560,7 +575,7 @@ const MyProfileAndLibrary = ({
                           theme.isDark ? 'bg-sky-900/40 text-sky-200' : 'bg-sky-100 text-sky-700'
                         } disabled:opacity-50`}
                       >
-                        Reuse
+                        {t?.('reuse') || 'Reuse'}
                       </button>
                     ) : null}
                     <button
@@ -594,10 +609,10 @@ const MyProfileAndLibrary = ({
               className={`p-4 rounded-2xl border ${theme.isDark ? 'border-sky-900/40 bg-sky-950/20' : 'border-sky-100 bg-sky-50/80'} shadow-sm`}
             >
               <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 ${theme.textSub}`}>
-                Real friends (Checkmate accounts)
+                {t?.('friendsSectionTitle') || 'Real friends (Checkmate accounts)'}
               </h3>
               <p className={`text-xs ${theme.textSub} mb-3`}>
-                Enter their login username (same as on sign-in). They must accept before you can share packing lists.
+                {t?.('friendsSectionHint') || 'Enter their login username (same as on sign-in). They must accept before you can share packing lists.'}
               </p>
               <div className="flex gap-2">
                 <input
@@ -607,7 +622,7 @@ const MyProfileAndLibrary = ({
                     setReqUsername(e.target.value.toLowerCase());
                     setReverseIncomingId(null);
                   }}
-                  placeholder="username"
+                  placeholder={t?.('username') || 'username'}
                   className={`flex-1 min-w-0 px-3 py-2 rounded-xl border text-sm outline-none ${
                     theme.isDark ? 'bg-slate-900 border-slate-600 text-slate-100' : 'border-gray-200 bg-white'
                   }`}
@@ -619,7 +634,7 @@ const MyProfileAndLibrary = ({
                     void (async () => {
                       const u = reqUsername.trim().toLowerCase();
                       if (!u) {
-                        setReqMsg('Enter a username.');
+                        setReqMsg(t?.('enterUsername') || 'Enter a username.');
                         return;
                       }
                       setReqBusy(true);
@@ -628,16 +643,16 @@ const MyProfileAndLibrary = ({
                       try {
                         await api.createFriendRequest({ username: u });
                         setReqUsername('');
-                        setReqMsg('Request sent.');
+                        setReqMsg(t?.('requestSent') || 'Request sent.');
                         await onRefresh?.();
                         await reloadFriendRequests();
                       } catch (err) {
                         const incomingId = err?.body?.incoming_request_id;
                         if (err?.status === 409 && incomingId) {
                           setReverseIncomingId(incomingId);
-                          setReqMsg('They already sent you a request — accept below.');
+                          setReqMsg(t?.('incomingRequestExists') || 'They already sent you a request — accept below.');
                         } else {
-                          setReqMsg(err?.message || 'Failed.');
+                          setReqMsg(err?.message || t?.('requestFailed') || 'Failed.');
                         }
                       } finally {
                         setReqBusy(false);
@@ -646,11 +661,11 @@ const MyProfileAndLibrary = ({
                   }}
                   className={`btn-primary-soft shrink-0 px-4 py-2 rounded-xl text-xs font-bold text-white ${theme.primary} disabled:opacity-50`}
                 >
-                  Send
+                  {t?.('share') || 'Send'}
                 </button>
               </div>
               {reqLookupBusy ? (
-                <p className={`text-[11px] mt-2 ${theme.textSub}`}>Looking up…</p>
+                <p className={`text-[11px] mt-2 ${theme.textSub}`}>{t?.('lookingUp') || 'Looking up…'}</p>
               ) : null}
               {!reqLookupBusy && reqLookup?.ok && reqLookup.user ? (
                 <div
@@ -663,11 +678,11 @@ const MyProfileAndLibrary = ({
                 </div>
               ) : null}
               {!reqLookupBusy && reqLookup && reqLookup.ok === false ? (
-                <p className="text-[11px] mt-2 text-amber-700 dark:text-amber-300">No user with that username.</p>
+                <p className="text-[11px] mt-2 text-amber-700 dark:text-amber-300">{t?.('noSuchUser') || 'No user with that username.'}</p>
               ) : null}
               {reverseIncomingId ? (
                 <div className="mt-3 flex items-center justify-between gap-2">
-                  <p className={`text-[11px] font-medium ${theme.textMain}`}>Accept their pending request?</p>
+                  <p className={`text-[11px] font-medium ${theme.textMain}`}>{t?.('acceptPendingQuestion') || 'Accept their pending request?'}</p>
                   <button
                     type="button"
                     className={`btn-primary-soft px-3 py-1.5 rounded-lg text-xs font-bold text-white ${theme.primary}`}
@@ -676,7 +691,7 @@ const MyProfileAndLibrary = ({
                         try {
                           await api.acceptFriendRequest(reverseIncomingId);
                           setReverseIncomingId(null);
-                          setReqMsg('You are now friends.');
+                          setReqMsg(t?.('requestSent') || 'Request sent.');
                           setReqUsername('');
                           await onRefresh?.();
                           await reloadFriendRequests();
@@ -686,7 +701,7 @@ const MyProfileAndLibrary = ({
                       })();
                     }}
                   >
-                    Accept
+                    {t?.('accept') || 'Accept'}
                   </button>
                 </div>
               ) : null}
@@ -696,7 +711,7 @@ const MyProfileAndLibrary = ({
             {incoming.length > 0 ? (
               <div>
                 <h3 className={`text-xs font-bold ${theme.textSub} uppercase tracking-wider mb-2`}>
-                  Incoming requests
+                  {t?.('incomingRequests') || 'Incoming requests'}
                 </h3>
                 <ul className="space-y-2">
                   {incoming.map((r) => (
@@ -725,7 +740,7 @@ const MyProfileAndLibrary = ({
                             theme.isDark ? 'bg-slate-800 text-slate-300' : 'bg-gray-100 text-gray-600'
                           }`}
                         >
-                          Decline
+                          {t?.('decline') || 'Decline'}
                         </button>
                         <button
                           type="button"
@@ -742,7 +757,7 @@ const MyProfileAndLibrary = ({
                           }}
                           className={`btn-primary-soft px-3 py-1.5 rounded-lg text-xs font-bold text-white ${theme.primary}`}
                         >
-                          Accept
+                          {t?.('accept') || 'Accept'}
                         </button>
                       </div>
                     </li>
@@ -753,7 +768,9 @@ const MyProfileAndLibrary = ({
 
             {outgoing.length > 0 ? (
               <div>
-                <h3 className={`text-xs font-bold ${theme.textSub} uppercase tracking-wider mb-2`}>Waiting on</h3>
+                <h3 className={`text-xs font-bold ${theme.textSub} uppercase tracking-wider mb-2`}>
+                  {t?.('outgoingRequests') || 'Waiting for response'}
+                </h3>
                 <ul className="flex flex-wrap gap-2">
                   {outgoing.map((r) => (
                     <li
@@ -771,14 +788,15 @@ const MyProfileAndLibrary = ({
 
             <div>
               <h3 className={`text-xs font-bold ${theme.textSub} uppercase tracking-wider mb-3`}>
-                Friends ({friends.length})
+                {(t?.('friendsCount') || 'Friends ({count})').replace('{count}', String(friends.length))}
               </h3>
               {friends.length === 0 ? (
                 <div className={`text-center py-12 px-4 rounded-2xl ${theme.cardBg} border ${panelClass}`}>
                   <Users className={`mx-auto mb-3 ${theme.textSub}`} size={32} />
-                  <p className={`text-sm font-medium ${theme.textMain}`}>No friends yet</p>
+                  <p className={`text-sm font-medium ${theme.textMain}`}>{t?.('noFriendsYet') || 'No friends yet'}</p>
                   <p className={`text-xs ${theme.textSub} mt-1`}>
-                    Send a request with their Checkmate username above. After they accept, they will appear here.
+                    {t?.('noFriendsHint') ||
+                      'Send a request with their Checkmate username above. After they accept, they will appear here.'}
                   </p>
                 </div>
               ) : (
@@ -805,7 +823,7 @@ const MyProfileAndLibrary = ({
                         <span
                           className={`text-[10px] font-bold px-2 py-1 rounded-lg ${theme.primaryLight} ${theme.primaryText}`}
                         >
-                          Live
+                          {t?.('online') || 'Online'}
                         </span>
                         <button
                           type="button"
@@ -837,9 +855,12 @@ const MyProfileAndLibrary = ({
               theme.isDark ? 'border-slate-600' : 'border-gray-100'
             }`}
           >
-            <h3 className={`text-lg font-bold ${theme.textMain} mb-2`}>Remove friend?</h3>
+            <h3 className={`text-lg font-bold ${theme.textMain} mb-2`}>
+              {t?.('removeFriendTitle') || 'Remove friend?'}
+            </h3>
             <p className={`text-sm ${theme.textSub} mb-6`}>
-              They will be removed from shared lists and any items assigned to them will go back to you.
+              {t?.('removeFriendHint') ||
+                'They will be removed from shared lists and any items assigned to them will go back to you.'}
             </p>
             {deleteError ? <p className="text-xs text-red-500 mb-4">{deleteError}</p> : null}
             <div className="flex gap-3">
@@ -853,7 +874,7 @@ const MyProfileAndLibrary = ({
                   theme.isDark ? 'bg-slate-800 text-slate-200' : 'bg-gray-100 text-gray-600'
                 }`}
               >
-                Cancel
+                {t?.('cancel') || 'Cancel'}
               </button>
               <button
                 type="button"
@@ -861,7 +882,7 @@ const MyProfileAndLibrary = ({
                 onClick={() => void confirmDelete()}
                 className="btn-danger-soft flex-1 py-3 rounded-xl font-bold text-sm disabled:opacity-50"
               >
-                Remove
+                {t?.('remove') || 'Remove'}
               </button>
             </div>
           </div>
@@ -886,7 +907,7 @@ const MyProfileAndLibrary = ({
                   theme.isDark ? 'bg-slate-800 text-slate-200' : 'bg-gray-100 text-gray-600'
                 }`}
               >
-                Cancel
+                {t?.('cancel') || 'Cancel'}
               </button>
               <button
                 type="button"
@@ -894,7 +915,7 @@ const MyProfileAndLibrary = ({
                 onClick={() => void runConfirmAction()}
                 className="btn-danger-soft flex-1 py-3 rounded-xl font-bold text-sm disabled:opacity-50"
               >
-                {confirmBusy ? 'Please wait…' : confirmDialog.confirmLabel || 'Confirm'}
+                {confirmBusy ? (t?.('pleaseWaitText') || 'Please wait…') : confirmDialog.confirmLabel || (t?.('done') || 'Confirm')}
               </button>
             </div>
           </div>

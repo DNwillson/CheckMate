@@ -254,7 +254,7 @@ const SystemSettings = ({
         <div className={`${theme.cardBg} p-5 ${cardClass} flex items-center space-x-4`}>
           <img src={currentUser?.avatar} alt="avatar" className="w-16 h-16 rounded-full bg-black/5" />
           <div className="flex-1 min-w-0">
-            <h3 className={`font-bold ${theme.textMain} text-lg truncate`}>{currentUser?.name || 'User'}</h3>
+            <h3 className={`font-bold ${theme.textMain} text-lg truncate`}>{currentUser?.name || t('defaultUserName')}</h3>
             <p className={`text-xs ${theme.textSub} truncate`}>
               {t('signedIn')} · @{currentUser?.username || '—'}
               {currentUser?.db_id != null ? ` · #${currentUser.db_id}` : ''}
@@ -530,9 +530,8 @@ const SystemSettings = ({
                       }
                       if (
                         !window.confirm(
-                          appPrefs?.language === 'zh'
-                            ? '确定永久删除账号？此操作无法撤销。'
-                            : 'Permanently delete your account? This cannot be undone.',
+                          t('deleteAccountConfirmPrompt') ||
+                            'Permanently delete your account? This cannot be undone.',
                         )
                       )
                         return;
@@ -540,7 +539,7 @@ const SystemSettings = ({
                       try {
                         await onDeleteAccount();
                       } catch {
-                        window.alert('Could not delete account.');
+                        window.alert(t('deleteAccountFail'));
                         setDeleteBusy(false);
                       }
                     })();

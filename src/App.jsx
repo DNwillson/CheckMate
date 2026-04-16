@@ -624,6 +624,7 @@ export default function App() {
             onReuseHistoryTrip={handleReuseHistoryTrip}
             initialSegment={meInitialSegment}
             theme={THEME}
+            t={t}
           />
         );
 
@@ -637,6 +638,7 @@ export default function App() {
             }}
             theme={THEME}
             t={t}
+            language={appPrefs?.language || 'en'}
           />
         );
 
@@ -677,13 +679,13 @@ export default function App() {
         if (!scenario) {
           return (
             <div className={`p-8 ${THEME.textMain}`}>
-              <p className="text-center text-sm">{"We couldn't find that scenario. Go back and try again."}</p>
+              <p className="text-center text-sm">{t('scenarioNotFound') || "We couldn't find that scenario. Go back and try again."}</p>
               <button
                 type="button"
                 onClick={() => setCurrentView(activeTab)}
                 className={`mt-6 w-full py-3 rounded-xl font-bold ${THEME.primary} text-white`}
               >
-                Go back
+                {t('goBack') || 'Go back'}
               </button>
             </div>
           );
@@ -768,7 +770,7 @@ export default function App() {
             className={`absolute inset-0 z-[60] flex flex-col items-center justify-center gap-3 ${THEME.sessionMask}`}
           >
             <div className={`h-8 w-8 rounded-full border-2 animate-spin ${THEME.sessionSpinner}`} />
-            <p className={`text-sm font-semibold ${THEME.textMain}`}>Loading…</p>
+            <p className={`text-sm font-semibold ${THEME.textMain}`}>{t('pleaseWaitText')}</p>
           </div>
         ) : null}
 

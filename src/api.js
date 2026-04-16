@@ -100,10 +100,10 @@ export const api = {
   declineFriendRequest: (id) =>
     request(`/api/friends/requests/${encodeURIComponent(id)}/decline`, { method: 'POST', body: '{}' }),
 
-  shareScenario: (scenarioId, username) =>
+  shareScenario: (scenarioId, username, canEdit = false) =>
     request(`/api/scenarios/${encodeURIComponent(scenarioId)}/share`, {
       method: 'POST',
-      body: JSON.stringify({ username }),
+      body: JSON.stringify({ username, can_edit: !!canEdit }),
     }),
   unshareScenario: (scenarioId, username) =>
     request(

@@ -2,7 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { Plus, Trash2, AlertCircle, Circle } from 'lucide-react';
 import { uiT } from '../uiCopy';
 
-const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = 'en' }) => {
+const CreateNewTrip = ({
+  onBack,
+  onSave,
+  theme,
+  initialTrip = null,
+  language = 'en',
+  isSaving = false,
+  saveError = null,
+}) => {
   const t = uiT(language);
   const [name, setName] = useState('');
   const [tripStartAt, setTripStartAt] = useState('');
@@ -50,6 +58,7 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
   };
 
   const handleSave = async () => {
+    if (isSaving) return;
     if (!name || items.length === 0) return;
     if (tripStartAt && new Date(tripStartAt) < new Date()) {
       window.alert(t('tripStartPastError'));
@@ -77,19 +86,28 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
   return (
     <div className={`min-h-screen ${theme.bg} flex flex-col`}>
       <div className={`sticky top-0 z-20 ${theme.bg}/90 backdrop-blur-md px-4 h-16 flex items-center justify-between border-b border-[#F0F0F0]`}>
-        <button type="button" onClick={onBack} className="text-[#9A9A9A] font-medium">
+        <button type="button" onClick={onBack} disabled={isSaving} className={`font-medium ${isSaving ? 'text-[#D1D1D1] cursor-not-allowed' : 'text-[#9A9A9A]'}`}>
           {t('commonCancel')}
         </button>
         <span className={`font-bold ${theme.textMain}`}>{t('createTripTitle')}</span>
         <button
           type="button"
           onClick={handleSave}
-          disabled={!name || items.length === 0}
-          className={`font-bold ${!name || items.length === 0 ? 'text-[#D1D1D1]' : theme.primaryText}`}
+          disabled={isSaving || !name || items.length === 0}
+          className={`font-bold ${isSaving || !name || items.length === 0 ? 'text-[#D1D1D1] cursor-not-allowed' : theme.primaryText}`}
         >
-          {t('commonSave')}
+          {isSaving ? (language === 'zh' ? '保存中…' : 'Saving…') : t('commonSave')}
         </button>
       </div>
+      {saveError ? (
+        <div className="px-6 pt-4">
+          <div className={`rounded-2xl px-4 py-3 text-xs font-semibold ${
+            theme.isDark ? 'bg-rose-950/40 text-rose-200 border border-rose-900/40' : 'bg-rose-50 text-rose-800 border border-rose-100'
+          }`}>
+            {language === 'zh' ? `保存失败：${saveError}` : `Save failed: ${saveError}`}
+          </div>
+        </div>
+      ) : null}
       <div className="p-6 space-y-8 pb-32 overflow-y-auto">
         <div>
           <label className={`block text-xs font-bold ${theme.textSub} mb-3 ml-1`}>{t('tripNameLabel')}</label>
@@ -99,6 +117,7 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
             className={`input-soft w-full text-xl py-3 px-4 ${theme.cardBg} ${theme.textMain} placeholder-[#D1D1D1]`}
             value={name}
             onChange={(e) => setName(e.target.value)}
+            disabled={isSaving}
           />
         </div>
         <div>
@@ -113,6 +132,7 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
                 className={`input-soft w-full py-3 px-4 ${theme.cardBg} ${theme.textMain}`}
                 value={tripStartAt}
                 onChange={(e) => setTripStartAt(e.target.value)}
+                disabled={isSaving}
               />
             </div>
             <div>
@@ -124,6 +144,7 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
                 className={`input-soft w-full py-3 px-4 ${theme.cardBg} ${theme.textMain}`}
                 value={tripEndAt}
                 onChange={(e) => setTripEndAt(e.target.value)}
+                disabled={isSaving}
               />
             </div>
           </div>
@@ -147,11 +168,12 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
                 value={criticalInput}
                 onChange={(e) => setCriticalInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addItem(criticalInput, true)}
+                disabled={isSaving}
               />
               <button
                 type="button"
                 onClick={() => addItem(criticalInput, true)}
-                disabled={!criticalInput.trim()}
+                disabled={isSaving || !criticalInput.trim()}
                 className={`p-2 rounded-lg ${criticalInput.trim() ? `btn-primary-soft ${theme.primary} text-white` : 'bg-[#F5F5F5] text-[#D1D1D1]'}`}
               >
                 <Plus size={16} />
@@ -175,11 +197,12 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
                 value={optionalInput}
                 onChange={(e) => setOptionalInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addItem(optionalInput, false)}
+                disabled={isSaving}
               />
               <button
                 type="button"
                 onClick={() => addItem(optionalInput, false)}
-                disabled={!optionalInput.trim()}
+                disabled={isSaving || !optionalInput.trim()}
                 className={`p-2 rounded-lg ${optionalInput.trim() ? `btn-primary-soft ${theme.primary} text-white` : 'bg-[#F5F5F5] text-[#D1D1D1]'}`}
               >
                 <Plus size={16} />
@@ -201,7 +224,8 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
                 </div>
                 <button
                   type="button"
-                  onClick={() => setItems(items.filter((i) => i.id !== item.id))}
+                  onClick={() => !isSaving && setItems(items.filter((i) => i.id !== item.id))}
+                  disabled={isSaving}
                   className="btn-ghost-soft text-[#D1D1D1] hover:text-[#D98282] p-1 rounded-lg"
                 >
                   <Trash2 size={17} />
@@ -211,6 +235,18 @@ const CreateNewTrip = ({ onBack, onSave, theme, initialTrip = null, language = '
           </div>
         </div>
       </div>
+      {isSaving ? (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/20">
+          <div className={`${theme.cardBg} rounded-3xl px-5 py-4 shadow-xl border ${
+            theme.isDark ? 'border-slate-700/60' : 'border-gray-100'
+          } flex items-center gap-3`}>
+            <div className={`h-5 w-5 rounded-full border-2 animate-spin ${theme.isDark ? 'border-slate-500 border-t-transparent' : 'border-gray-400 border-t-transparent'}`} />
+            <p className={`text-sm font-semibold ${theme.textMain}`}>
+              {language === 'zh' ? '正在保存…' : 'Saving…'}
+            </p>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

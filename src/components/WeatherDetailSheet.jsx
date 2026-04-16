@@ -25,28 +25,29 @@ const Glyph = ({ iconKey, className, size = 28 }) => {
   }
 };
 
-function formatHour(iso) {
+function formatHour(iso, locale) {
   try {
     const d = new Date(iso);
-    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    return d.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
   } catch {
     return iso;
   }
 }
 
-function formatDay(dateStr) {
+function formatDay(dateStr, locale) {
   try {
     const d = new Date(dateStr);
-    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    return d.toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
   } catch {
     return dateStr;
   }
 }
 
-export default function WeatherDetailSheet({ open, onClose, theme, weatherFetchParams }) {
+export default function WeatherDetailSheet({ open, onClose, theme, weatherFetchParams, language = 'en' }) {
   const [detail, setDetail] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
+  const locale = language === 'zh' ? 'zh-CN' : 'en-US';
 
   const fetchKey = useMemo(() => {
     const p = weatherFetchParams || {};
@@ -167,7 +168,7 @@ export default function WeatherDetailSheet({ open, onClose, theme, weatherFetchP
                       key={`${h.time}-${i}`}
                       className="shrink-0 w-[72px] rounded-2xl bg-white border border-gray-100/90 py-2.5 px-1 flex flex-col items-center shadow-sm"
                     >
-                      <span className={`text-[10px] font-bold ${theme.textSub}`}>{formatHour(h.time)}</span>
+                      <span className={`text-[10px] font-bold ${theme.textSub}`}>{formatHour(h.time, locale)}</span>
                       <Glyph iconKey={h.iconKey} size={22} className={`${theme.primaryText} my-1`} />
                       <span className={`text-sm font-bold ${theme.textMain}`}>{h.temp}°</span>
                       {h.precipProb != null && h.precipProb > 0 ? (
@@ -192,10 +193,10 @@ export default function WeatherDetailSheet({ open, onClose, theme, weatherFetchP
                       className="flex items-center gap-3 rounded-2xl bg-white border border-gray-100 px-3 py-2.5 shadow-sm"
                     >
                       <div className="w-24 shrink-0">
-                        <p className={`text-xs font-bold ${theme.textMain}`}>{formatDay(d.date)}</p>
+                        <p className={`text-xs font-bold ${theme.textMain}`}>{formatDay(d.date, locale)}</p>
                         {d.sunrise && d.sunset ? (
                           <p className={`text-[9px] ${theme.textSub} mt-0.5`}>
-                            ↑ {formatHour(d.sunrise)} · ↓ {formatHour(d.sunset)}
+                            ↑ {formatHour(d.sunrise, locale)} · ↓ {formatHour(d.sunset, locale)}
                           </p>
                         ) : null}
                       </div>

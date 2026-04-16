@@ -2931,6 +2931,7 @@ def create_app() -> Flask:
         uid = g.current_user.id
         payload = request.get_json(force=True, silent=True) or {}
         u = _validate_username(payload.get("username"))
+        can_edit = bool(payload.get("can_edit"))
         if not u:
             return jsonify({"error": "username is required."}), 400
         target = User.query.filter_by(username=u).first()
@@ -2947,17 +2948,20 @@ def create_app() -> Flask:
             owner_user_id=uid, scenario_id=scenario_id, shared_with_user_id=target.id
         ).first()
         if existing:
-            return jsonify({"ok": True, "already": True})
+            if existing.can_edit != can_edit:
+                existing.can_edit = can_edit
+                db.session.commit()
+            return jsonify({"ok": True, "already": True, "can_edit": bool(existing.can_edit)})
         db.session.add(
             ScenarioShare(
                 owner_user_id=uid,
                 scenario_id=scenario_id,
                 shared_with_user_id=target.id,
-                can_edit=False,
+                can_edit=can_edit,
             )
         )
         db.session.commit()
-        return jsonify({"ok": True}), 201
+        return jsonify({"ok": True, "can_edit": can_edit}), 201
 
     @app.delete("/api/scenarios/<scenario_id>/share")
     @require_auth

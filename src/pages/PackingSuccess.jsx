@@ -13,18 +13,38 @@ function formatWhen(iso) {
 
 const PackingSuccess = ({ onHome, onViewHistory, lastPacked, theme, t }) => {
   return (
-    <div className={`h-full flex flex-col items-center justify-center p-8 ${theme.success} relative overflow-hidden`}>
-      <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-b from-[#E9EDC9]/50 to-transparent"></div>
-      <div className="absolute top-20 right-10 w-32 h-32 bg-[#FEFAE0] rounded-full blur-3xl opacity-60 animate-pulse"></div>
+    <div className={`h-full flex flex-col items-center justify-center p-8 ${theme.bg} relative overflow-hidden`}>
+      <div
+        className={`absolute inset-0 ${
+          theme.isDark
+            ? 'bg-gradient-to-b from-slate-900/30 via-transparent to-transparent'
+            : 'bg-gradient-to-b from-slate-50/80 via-transparent to-transparent'
+        }`}
+      />
+      <div
+        className={`absolute top-16 right-8 w-32 h-32 rounded-full blur-3xl opacity-60 animate-pulse ${
+          theme.isDark ? 'bg-slate-700/20' : 'bg-slate-200/60'
+        }`}
+      />
 
       <div className="z-10 flex flex-col items-center text-center animate-fade-in">
         <div className="relative mb-12 animate-float">
-           <div className="w-40 h-40 bg-[#FEFAE0] rounded-full flex items-center justify-center shadow-2xl shadow-[#CCD5AE]/50">
-              <Sun size={80} className={theme.primaryText} strokeWidth={1.5} />
-           </div>
-           <div className="absolute -bottom-4 -right-2 bg-white p-3 rounded-full shadow-lg rotate-12">
-              <Smile size={32} className={theme.success} />
-           </div>
+          <div
+            className={`w-40 h-40 rounded-full flex items-center justify-center shadow-2xl ${
+              theme.isDark
+                ? 'bg-slate-900/40 border border-slate-700/50 shadow-black/40'
+                : `${theme.primaryLight} border border-white/70 shadow-slate-200/60`
+            }`}
+          >
+            <Sun size={80} className={theme.primaryText} strokeWidth={1.5} />
+          </div>
+          <div
+            className={`absolute -bottom-4 -right-2 p-3 rounded-full shadow-lg rotate-12 border ${
+              theme.isDark ? 'bg-slate-900 border-slate-700/60' : 'bg-white border-white/70'
+            }`}
+          >
+            <Smile size={32} className={theme.primaryText} />
+          </div>
         </div>
 
         <h2 className={`text-3xl font-bold mb-3 ${theme.textMain} tracking-tight`}>{t?.('allSet') || 'All Set!'}</h2>
@@ -55,7 +75,7 @@ const PackingSuccess = ({ onHome, onViewHistory, lastPacked, theme, t }) => {
           <button
             type="button"
             onClick={onHome}
-            className={`flex-1 bg-[#FEFAE0] ${theme.primaryText} px-6 py-4 rounded-[20px] font-bold text-sm shadow-xl hover:bg-white transition-all active:scale-95 flex items-center justify-center gap-2`}
+            className={`flex-1 ${theme.primary} text-white px-6 py-4 rounded-[20px] font-bold text-sm shadow-xl ${theme.primaryHover} transition-all active:scale-95 flex items-center justify-center gap-2`}
           >
             <span>{t?.('backHome') || "Let's Go"}</span>
             <ArrowRight size={18} />

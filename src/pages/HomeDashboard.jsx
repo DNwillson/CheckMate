@@ -58,6 +58,7 @@ const HomeDashboard = ({
   onRefreshWeather,
   weatherFetchParams,
   weatherDetail,
+  language = 'en',
   theme,
   t,
 }) => {
@@ -90,13 +91,14 @@ const HomeDashboard = ({
   const hint = weather?.packingHint || (weatherLoading ? t?.('fetchingForecast') : t?.('tapRefreshWeather'));
   const tempUnit = weather?.tempUnit || 'C';
   const tipTargetDate = selectedWeatherTipDate || getLocalDateKey();
+  const locale = language === 'zh' ? 'zh-CN' : 'en-US';
   const tipDateLabel = useMemo(() => {
     try {
-      return new Date(tipTargetDate).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+      return new Date(tipTargetDate).toLocaleDateString(locale, { weekday: 'short', month: 'short', day: 'numeric' });
     } catch {
       return tipTargetDate;
     }
-  }, [tipTargetDate]);
+  }, [tipTargetDate, locale]);
   const weatherTipDays = useMemo(() => {
     const days = Array.isArray(weatherDetail?.daily) ? weatherDetail.daily : [];
     return days.slice(0, 7);
@@ -360,6 +362,7 @@ const HomeDashboard = ({
         onClose={() => setDetailOpen(false)}
         theme={theme}
         weatherFetchParams={weatherFetchParams}
+        language={language}
       />
 
       <div className={`rounded-xl p-3 border ${theme.isDark ? 'border-slate-700/60 bg-slate-900/40' : 'border-[#EFEFEF] bg-white'} shadow-sm`}>
@@ -403,7 +406,7 @@ const HomeDashboard = ({
                               : 'bg-slate-50 text-slate-700 border-slate-200'
                         }`}
                       >
-                        {new Date(d.date).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' })}
+                        {new Date(d.date).toLocaleDateString(locale, { weekday: 'short', day: 'numeric' })}
                       </button>
                     );
                   })}

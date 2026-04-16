@@ -418,7 +418,7 @@ const MyProfileAndLibrary = ({
                         type: 'deleteSelectedTrips',
                         title: t?.('deleteSelectedConfirmTitle') || 'Delete selected trips?',
                         message: (t?.('deleteSelectedConfirmMsg') || 'Delete {count} selected trips? This action cannot be undone.').replace('{count}', String(selectedTripIds.length)),
-                        confirmLabel: t?.('deleteAccount') || 'Delete',
+                        confirmLabel: t?.('commonDelete') || 'Delete',
                         tripIds: selectedTripIds,
                       });
                     }}
@@ -444,7 +444,7 @@ const MyProfileAndLibrary = ({
                           type: 'deleteTrip',
                           title: t?.('deleteTripConfirmTitle') || 'Delete this trip?',
                           message: t?.('cannotUndo') || 'This action cannot be undone.',
-                          confirmLabel: t?.('deleteAccount') || 'Delete',
+                          confirmLabel: t?.('commonDelete') || 'Delete',
                           tripId: scenarioId,
                         });
                       }}

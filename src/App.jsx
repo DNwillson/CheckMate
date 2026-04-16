@@ -66,8 +66,13 @@ export default function App() {
   const [meInitialSegment, setMeInitialSegment] = useState(null);
   const [lastPacked, setLastPacked] = useState(null);
   const [quickTemplateDraft, setQuickTemplateDraft] = useState(null);
+  const [createTripSaving, setCreateTripSaving] = useState(false);
+  const [createTripError, setCreateTripError] = useState(null);
+  const [scenarioSavingId, setScenarioSavingId] = useState(null);
+  const [scenarioSaveError, setScenarioSaveError] = useState(null);
   const appPrefsRef = useRef(DEFAULT_APP_PREFS);
   const currentThemeKeyRef = useRef(currentThemeKey);
+  const scenarioUpdateStateRef = useRef({});
 
   const t = useMemo(() => uiT(appPrefs?.language || 'en'), [appPrefs?.language]);
 
@@ -449,22 +454,61 @@ export default function App() {
   }, []);
 
   const handleUpdateScenario = async (updated) => {
-    const isSharedEdit = updated?.access === 'shared_edit' || (activeScenarioOwnerId ?? null) !== null;
-    const payload = isSharedEdit ? { items: updated.items } : updated;
-    const saved = await api.updateScenario(updated.id, payload);
+    const id = updated?.id;
+    if (!id) return;
+
+    // Optimistic UI update so the user sees changes immediately.
     setScenarios((prev) =>
       prev.map((s) => {
-        if (s.id !== updated.id) return s;
+        if (s.id !== id) return s;
         if ((s.owner_user_id ?? null) !== (activeScenarioOwnerId ?? null)) return s;
-        return {
-          ...saved,
-          owner_user_id: s.owner_user_id,
-          access: s.access,
-          owner_username: s.owner_username,
-          share_recipients: s.share_recipients,
-        };
+        return { ...s, ...updated };
       }),
     );
+
+    const existing = scenarioUpdateStateRef.current[id] || { inFlight: false, next: null };
+    if (existing.inFlight) {
+      scenarioUpdateStateRef.current[id] = { ...existing, next: updated };
+      return;
+    }
+
+    scenarioUpdateStateRef.current[id] = { inFlight: true, next: null };
+    setScenarioSavingId(id);
+    setScenarioSaveError(null);
+
+    let current = updated;
+    try {
+      while (current) {
+        const isSharedEdit =
+          current?.access === 'shared_edit' || (activeScenarioOwnerId ?? null) !== null;
+        const payload = isSharedEdit ? { items: current.items } : current;
+        const saved = await api.updateScenario(id, payload);
+        setScenarios((prev) =>
+          prev.map((s) => {
+            if (s.id !== id) return s;
+            if ((s.owner_user_id ?? null) !== (activeScenarioOwnerId ?? null)) return s;
+            return {
+              ...saved,
+              owner_user_id: s.owner_user_id,
+              access: s.access,
+              owner_username: s.owner_username,
+              share_recipients: s.share_recipients,
+            };
+          }),
+        );
+
+        const st = scenarioUpdateStateRef.current[id] || { inFlight: true, next: null };
+        current = st.next;
+        scenarioUpdateStateRef.current[id] = { ...st, next: null };
+      }
+    } catch (e) {
+      const msg = e?.message || '保存失败，请稍后重试。';
+      setScenarioSaveError(msg);
+    } finally {
+      const st = scenarioUpdateStateRef.current[id] || { inFlight: true, next: null };
+      scenarioUpdateStateRef.current[id] = { ...st, inFlight: false, next: null };
+      setScenarioSavingId((prev) => (prev === id ? null : prev));
+    }
   };
 
   const handleUpdateScenarioSchedule = useCallback(
@@ -490,8 +534,8 @@ export default function App() {
   }, [THEME.primaryLight, THEME.primaryText]);
 
   const handleShareScenario = useCallback(
-    async (scenarioId, username) => {
-      await api.shareScenario(scenarioId, username);
+    async (scenarioId, username, canEdit = false) => {
+      await api.shareScenario(scenarioId, username, canEdit);
       await refreshData();
     },
     [refreshData],
@@ -599,6 +643,7 @@ export default function App() {
             onRefreshWeather={loadWeather}
             weatherFetchParams={weatherFetchParams}
             weatherDetail={weatherDetail}
+            language={appPrefs?.language || 'en'}
             theme={THEME}
             t={t}
           />
@@ -695,6 +740,8 @@ export default function App() {
             scenario={scenario}
             friends={friends}
             updateScenario={handleUpdateScenario}
+            isSaving={scenarioSavingId === scenario.id}
+            saveError={scenarioSaveError}
             checkedItems={checkedItems}
             setCheckedItems={setCheckedItems}
             onBack={() => setCurrentView(activeTab)}
@@ -719,12 +766,23 @@ export default function App() {
               setCurrentView(activeTab);
             }}
             onSave={async (payload) => {
-              await handleSaveTrip({ ...payload, type: 'custom' });
-              setQuickTemplateDraft(null);
-              setMeInitialSegment('scenarios');
-              setActiveTab('me');
-              setCurrentView('me');
+              if (createTripSaving) return;
+              setCreateTripSaving(true);
+              setCreateTripError(null);
+              try {
+                await handleSaveTrip({ ...payload, type: 'custom' });
+                setQuickTemplateDraft(null);
+                setMeInitialSegment('scenarios');
+                setActiveTab('me');
+                setCurrentView('me');
+              } catch (e) {
+                setCreateTripError(e?.message || '保存失败，请稍后重试。');
+              } finally {
+                setCreateTripSaving(false);
+              }
             }}
+            isSaving={createTripSaving}
+            saveError={createTripError}
             theme={THEME}
           />
         );

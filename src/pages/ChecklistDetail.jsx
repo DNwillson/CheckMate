@@ -150,6 +150,8 @@ const ChecklistDetail = ({
   scenario,
   friends,
   updateScenario,
+  isSaving = false,
+  saveError = null,
   checkedItems,
   setCheckedItems,
   onBack,
@@ -186,6 +188,7 @@ const ChecklistDetail = ({
   const [showShareModal, setShowShareModal] = useState(false);
   const [assigningItem, setAssigningItem] = useState(null);
   const [shareUsername, setShareUsername] = useState('');
+  const [shareCanEdit, setShareCanEdit] = useState(false);
   const [shareBusy, setShareBusy] = useState(false);
   const [shareError, setShareError] = useState('');
   const [lookupPreview, setLookupPreview] = useState(null);
@@ -343,6 +346,20 @@ const ChecklistDetail = ({
           <span className={`font-bold ${theme.textMain} text-center text-[15px] leading-tight truncate w-full`}>
             {scenario.name}
           </span>
+          {isSaving ? (
+            <span
+              className={`mt-0.5 text-[10px] font-bold flex items-center gap-1 px-2 py-0.5 rounded-full ${
+                theme.isDark ? 'bg-slate-800 text-slate-300' : 'bg-white text-[#9A9A9A] shadow-sm'
+              }`}
+            >
+              <span
+                className={`inline-block h-2.5 w-2.5 rounded-full border-2 animate-spin ${
+                  theme.isDark ? 'border-slate-500 border-t-transparent' : 'border-gray-400 border-t-transparent'
+                }`}
+              />
+              Saving…
+            </span>
+          ) : null}
           {weather && weather.source === 'open-meteo' && weather.temp != null && weather.location ? (
             <span className={`text-[10px] ${theme.textSub} font-medium mt-0.5 text-center leading-tight px-1 line-clamp-2`}>
               {weather.locationDetail ? `${weather.locationDetail} · ` : ''}
@@ -371,6 +388,7 @@ const ChecklistDetail = ({
                     setShowShareModal(true);
                     setShareError('');
                     setShareUsername('');
+                    setShareCanEdit(false);
                   }}
                   className={`w-10 h-10 flex items-center justify-center rounded-full shadow-sm ${
                     theme.isDark ? 'bg-slate-800 text-sky-300' : 'bg-white text-sky-600'
@@ -410,6 +428,20 @@ const ChecklistDetail = ({
         </div>
       </div>
 
+      {saveError ? (
+        <div className="px-4 pt-3">
+          <div
+            className={`rounded-2xl px-3 py-2.5 text-xs font-semibold ${
+              theme.isDark
+                ? 'bg-rose-950/40 text-rose-200 border border-rose-900/40'
+                : 'bg-rose-50 text-rose-800 border border-rose-100'
+            }`}
+          >
+            {typeof t === 'function' ? t('saveFailed') || `保存失败：${saveError}` : `保存失败：${saveError}`}
+          </div>
+        </div>
+      ) : null}
+
       {readOnly ? (
         <div
           className={`mx-4 mt-3 px-3 py-2.5 rounded-2xl text-xs font-semibold ${
@@ -431,13 +463,27 @@ const ChecklistDetail = ({
             theme.isDark ? 'bg-violet-950/35 text-violet-100 border border-violet-800/50' : 'bg-violet-50 text-violet-950 border border-violet-100'
           }`}
         >
-          <p className="font-bold mb-2">{t?.('viewOnlyHint')}</p>
+          <p className="font-bold mb-2">{t?.('sharedWithTitle') || 'Shared with'}</p>
           <ul className="space-y-2">
             {scenario.share_recipients.map((r) => (
               <li key={r.username} className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   {r.avatar ? <img src={r.avatar} alt="" className="w-6 h-6 rounded-full bg-white object-cover" /> : null}
                   <span className="font-semibold truncate">@{r.username}</span>
+                  <span
+                    className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      r.can_edit
+                        ? theme.isDark
+                          ? 'bg-emerald-950/60 text-emerald-200 border border-emerald-900/40'
+                          : 'bg-emerald-50 text-emerald-800 border border-emerald-100'
+                        : theme.isDark
+                          ? 'bg-slate-900/60 text-slate-300 border border-slate-700/40'
+                          : 'bg-white text-[#777] border border-gray-100'
+                    }`}
+                    title={r.can_edit ? (t?.('sharePermissionEdit') || 'Can edit') : (t?.('sharePermissionView') || 'View only')}
+                  >
+                    {r.can_edit ? (t?.('sharePermissionEdit') || 'Can edit') : (t?.('sharePermissionView') || 'View only')}
+                  </span>
                 </div>
                 <button
                   type="button"
@@ -637,6 +683,33 @@ const ChecklistDetail = ({
             {!lookupBusy && lookupPreview && lookupPreview.ok === false ? (
               <p className="text-[11px] text-amber-700 dark:text-amber-300 mb-2">{t?.('noAccountWithUsername')}</p>
             ) : null}
+            <div
+              className={`mb-3 mt-2 rounded-2xl px-3 py-2 border flex items-center justify-between ${
+                theme.isDark ? 'border-slate-700 bg-slate-900/40' : 'border-gray-100 bg-gray-50/70'
+              }`}
+            >
+              <div className="min-w-0 pr-3">
+                <p className={`text-xs font-bold ${theme.textMain}`}>{t?.('shareAllowEditTitle') || 'Allow editing'}</p>
+                <p className={`text-[11px] ${theme.textSub}`}>
+                  {t?.('shareAllowEditHint') || 'If enabled, they can edit items in this trip.'}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={shareBusy}
+                onClick={() => setShareCanEdit((v) => !v)}
+                className={`shrink-0 w-12 h-7 rounded-full transition-colors relative ${
+                  shareCanEdit ? theme.primary : theme.isDark ? 'bg-slate-700' : 'bg-slate-200'
+                } ${shareBusy ? 'opacity-60' : ''}`}
+                aria-label={t?.('shareAllowEditTitle') || 'Allow editing'}
+              >
+                <span
+                  className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all ${
+                    shareCanEdit ? 'left-[1.6rem]' : 'left-0.5'
+                  }`}
+                />
+              </button>
+            </div>
             {friends.some((f) => f.is_registered) ? (
               <div className="mb-3">
                 <p className={`text-[10px] font-bold ${theme.textSub} uppercase mb-1`}>{t?.('yourFriends')}</p>
@@ -682,7 +755,7 @@ const ChecklistDetail = ({
                     setShareBusy(true);
                     setShareError('');
                     try {
-                      await onShareScenario(scenario.id, u);
+                      await onShareScenario(scenario.id, u, shareCanEdit);
                       setShowShareModal(false);
                     } catch (err) {
                       setShareError(err?.message || t?.('couldNotShare'));

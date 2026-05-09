@@ -521,7 +521,7 @@ const HomeDashboard = ({
 
         {myTrips.length ? (
           <div className="grid grid-cols-2 gap-4">
-            {myTrips.slice(0, 4).map((scenario) => {
+            {myTrips.map((scenario) => {
               const Icon = IconMap[scenario.icon] || IconMap.Briefcase;
               const cardTheme = scenario.theme || { bg: 'bg-white', text: 'text-gray-500' };
               const listKey =

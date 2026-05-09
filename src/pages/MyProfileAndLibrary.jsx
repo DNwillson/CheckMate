@@ -268,7 +268,7 @@ const MyProfileAndLibrary = ({
   useEffect(() => {
     const id = setInterval(() => {
       void reloadFriendRequests();
-    }, 10000);
+    }, 5000);
     return () => clearInterval(id);
   }, [reloadFriendRequests]);
 
@@ -686,7 +686,7 @@ const MyProfileAndLibrary = ({
                   }}
                   className={`btn-primary-soft shrink-0 px-4 py-2 rounded-xl text-xs font-bold text-white ${theme.primary} disabled:opacity-50`}
                 >
-                  {t?.('share') || 'Send'}
+                  {t?.('friendRequestSend') || 'Send request'}
                 </button>
               </div>
               {reqLookupBusy ? (

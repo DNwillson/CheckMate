@@ -229,23 +229,18 @@ const AIChatAssistant = ({
     setSelectedSuggestionIds(next);
   }, [isOpen, latestSuggestion]);
 
-  const handleCreateTripFromSuggestion = async () => {
+  const handleCreateTripFromSuggestion = () => {
     if (!selectedItems.length || !onCreateTripFromAssistant) return;
-    setImportBusy(true);
     setImportNote('');
     setImportNoteType('');
     try {
-      await onCreateTripFromAssistant({
+      onCreateTripFromAssistant({
         name: importTripName.trim(),
         items: selectedItems,
       });
-      setImportNote(t('aiImportCreatedOk').replace('{count}', String(selectedItems.length)));
-      setImportNoteType('success');
     } catch (e) {
       setImportNote(e?.message || t('aiImportCreateFail'));
       setImportNoteType('error');
-    } finally {
-      setImportBusy(false);
     }
   };
 
@@ -458,7 +453,7 @@ const AIChatAssistant = ({
                         : `${theme.primary} text-white`
                     }`}
                   >
-                    {t('aiImportCreateBtn')}
+                    {t('aiImportContinueToCreateBtn')}
                   </button>
                 </div>
 

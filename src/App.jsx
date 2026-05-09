@@ -211,7 +211,7 @@ export default function App() {
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return;
       const now = Date.now();
-      if (now - lastVisibilityRefreshRef.current < 4000) return;
+      if (now - lastVisibilityRefreshRef.current < 2500) return;
       lastVisibilityRefreshRef.current = now;
       void refreshData();
     };
@@ -225,7 +225,7 @@ export default function App() {
     if (!['home', 'me', 'quick', 'calendar'].includes(currentView)) return undefined;
     const id = setInterval(() => {
       void refreshData();
-    }, 28000);
+    }, 8000);
     return () => clearInterval(id);
   }, [currentUser, currentView, sessionRestoring, refreshData]);
 
@@ -390,21 +390,24 @@ export default function App() {
     await refreshData();
   };
 
+  /** 带着 AI 所选物品进入「新建行程」页，由用户填写出发时间后再保存 */
   const handleCreateTripFromAssistant = useCallback(
-    async ({ name, items }) => {
+    ({ name, items }) => {
       const cleanName = String(name || '').trim() || `AI Trip ${new Date().toLocaleDateString()}`;
       const cleanItems = ensureUniqueItemIds(Array.isArray(items) ? items : []);
-      if (!cleanItems.length) throw new Error('No items to import.');
-      await api.createScenario({
-        id: Date.now().toString(),
+      if (!cleanItems.length) return;
+      setQuickTemplateDraft({
         name: cleanName,
         icon: 'Backpack',
         theme: { bg: THEME.primaryLight, text: THEME.primaryText },
         items: cleanItems,
+        trip_start_at: null,
+        trip_end_at: null,
       });
-      await refreshData();
+      setIsChatOpen(false);
+      setCurrentView('create');
     },
-    [THEME.primaryLight, THEME.primaryText, refreshData],
+    [THEME.primaryLight, THEME.primaryText],
   );
 
   const handleAppendAssistantItems = useCallback(

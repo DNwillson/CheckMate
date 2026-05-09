@@ -313,15 +313,12 @@ const CalendarPage = ({
                         window.alert(t?.('tripPastDateBlocked') || 'You cannot create a trip in the past.');
                         return;
                       }
-                      const prevEnd = trip.trip_end_at ? new Date(trip.trip_end_at) : null;
-                      let nextEndIso = trip.trip_end_at || null;
-                      if (prevEnd && prev && prevEnd < prev) nextEndIso = null;
                       setQuickBusyId(trip.id);
                       void (async () => {
                         try {
                           await onUpdateScenarioSchedule?.(trip.id, {
                             trip_start_at: nextStart.toISOString(),
-                            trip_end_at: nextEndIso,
+                            trip_end_at: null,
                           });
                           setQuickDate(null);
                         } finally {
@@ -405,6 +402,7 @@ const CalendarPage = ({
                     try {
                       await onUpdateScenarioSchedule?.(rescheduleTarget.id, {
                         trip_start_at: rescheduleValue,
+                        trip_end_at: null,
                       });
                       setRescheduleTarget(null);
                     } finally {

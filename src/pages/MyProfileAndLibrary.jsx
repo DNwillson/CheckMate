@@ -29,6 +29,8 @@ const LibraryItem = ({
   selectionMode = false,
   isSelected = false,
   onToggleSelect,
+  /** 从「我的」列表进入详情时为 true，以允许在详情页增删改物品 */
+  openAllowManageItems = false,
 }) => {
   const Icon = IconMap[scenario.icon] || Briefcase;
   const cardTheme = scenario.theme || { bg: 'bg-[#F5F5F5]', text: 'text-[#9A9A9A]' };
@@ -45,7 +47,7 @@ const LibraryItem = ({
           onToggleSelect?.(scenario.id);
           return;
         }
-        onSelect(scenario.id, scenario.owner_user_id ?? null);
+        onSelect(scenario.id, scenario.owner_user_id ?? null, openAllowManageItems);
       }}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -54,7 +56,7 @@ const LibraryItem = ({
             onToggleSelect?.(scenario.id);
             return;
           }
-          onSelect(scenario.id, scenario.owner_user_id ?? null);
+          onSelect(scenario.id, scenario.owner_user_id ?? null, openAllowManageItems);
         }
       }}
       className={`flex items-center p-4 ${theme.cardBg} rounded-2xl border ${border} shadow-sm hover:shadow-md transition-all active:scale-[0.99] cursor-pointer group`}
@@ -439,6 +441,7 @@ const MyProfileAndLibrary = ({
                       key={s.access === 'shared' ? `sh-${s.owner_user_id}-${s.id}` : s.id}
                       scenario={s}
                       onSelect={onSelect}
+                      openAllowManageItems
                       onDelete={(scenarioId) => {
                         setConfirmDialog({
                           type: 'deleteTrip',
@@ -486,6 +489,7 @@ const MyProfileAndLibrary = ({
                       key={s.access === 'shared' ? `sh-${s.owner_user_id}-${s.id}` : s.id}
                       scenario={s}
                       onSelect={onSelect}
+                      openAllowManageItems
                       theme={theme}
                       t={t}
                     />

@@ -50,6 +50,8 @@ export default function App() {
   const [activeScenarioId, setActiveScenarioId] = useState(null);
   /** null = my list; number = shared list owner's user id */
   const [activeScenarioOwnerId, setActiveScenarioOwnerId] = useState(null);
+  /** 仅当从「我的」页进入清单详情时为 true，用于限制增删改物品仅在该入口可用 */
+  const [detailAllowManageItems, setDetailAllowManageItems] = useState(false);
   const [checkedItems, setCheckedItems] = useState({});
   const [activeTab, setActiveTab] = useState('home');
   const [currentThemeKey, setCurrentThemeKey] = useState('cinnamon');
@@ -219,9 +221,10 @@ export default function App() {
   );
 
   const handleSelectScenario = useCallback(
-    (id, ownerUserId = null) => {
+    (id, ownerUserId = null, allowManageItems = false) => {
       setActiveScenarioId(id);
       setActiveScenarioOwnerId(ownerUserId);
+      setDetailAllowManageItems(!!allowManageItems);
       const sc = scenarios.find(
         (s) => s.id === id && (s.owner_user_id ?? null) === (ownerUserId ?? null),
       );
@@ -252,6 +255,7 @@ export default function App() {
     setWeatherError(null);
     setWeatherLoading(false);
     setActiveScenarioOwnerId(null);
+    setDetailAllowManageItems(false);
     setAppPrefs(DEFAULT_APP_PREFS);
     appPrefsRef.current = DEFAULT_APP_PREFS;
     setCurrentThemeKey('cinnamon');
@@ -350,7 +354,7 @@ export default function App() {
       theme: newScenario.theme,
       items: newScenario.items,
       trip_start_at: newScenario.trip_start_at ?? null,
-      trip_end_at: newScenario.trip_end_at ?? null,
+      trip_end_at: null,
     });
     await refreshData();
   };
@@ -751,6 +755,7 @@ export default function App() {
             meUser={meProfile}
             onShareScenario={handleShareScenario}
             onUnshareScenario={handleUnshareScenario}
+            allowManageItems={detailAllowManageItems}
             t={t}
           />
         );

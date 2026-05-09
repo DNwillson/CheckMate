@@ -11,6 +11,10 @@ import {
   Briefcase,
   UserCircle2,
   UserMinus,
+  Plus,
+  Trash2,
+  Circle,
+  Pencil,
 } from 'lucide-react';
 import { CURRENT_USER, IconMap } from '../constants/data';
 import { api } from '../api';
@@ -45,6 +49,8 @@ const CheckItem = ({
   t,
   canAssign,
   readOnly,
+  onEdit,
+  onDelete,
 }) => {
   const isCritical = type === 'critical';
   const hasCollaborators = collaborators && collaborators.length > 0;
@@ -121,6 +127,40 @@ const CheckItem = ({
           </div>
         </div>
       </button>
+      {!readOnly && (onEdit || onDelete) ? (
+        <div className="flex items-center gap-0.5 shrink-0">
+          {onEdit ? (
+            <button
+              type="button"
+              aria-label={t?.('detailEditItem') || 'Edit'}
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+              className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 ${
+                theme.isDark ? 'bg-slate-800 hover:bg-slate-700 text-slate-200' : 'bg-[#F7F7F7] hover:bg-[#EFEFEF] text-[#666]'
+              }`}
+            >
+              <Pencil size={16} strokeWidth={2} />
+            </button>
+          ) : null}
+          {onDelete ? (
+            <button
+              type="button"
+              aria-label={t?.('remove') || 'Remove'}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95 ${
+                theme.isDark ? 'bg-slate-800 hover:bg-rose-900/40 text-rose-300' : 'bg-[#F7F7F7] hover:bg-[#FADCDC] text-[#B85C5C]'
+              }`}
+            >
+              <Trash2 size={16} strokeWidth={2} />
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {canAssign && !readOnly ? (
         <button
           type="button"
@@ -161,6 +201,8 @@ const ChecklistDetail = ({
   meUser,
   onShareScenario,
   onUnshareScenario,
+  /** 仅当从「我的」页进入详情时为 true；为 false 时不显示增删改物品，仍可在本页勾选、指派、分享 */
+  allowManageItems = false,
   t,
 }) => {
   const ensureUniqueItemIds = useCallback((items) => {
@@ -183,6 +225,7 @@ const ChecklistDetail = ({
   const me = meUser || CURRENT_USER;
   const readOnly = scenario.access === 'shared';
   const isOwner = scenario.access === 'owner';
+  const canManageListItems = !!allowManageItems && !readOnly;
   const [isClosing, setIsClosing] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -193,6 +236,10 @@ const ChecklistDetail = ({
   const [shareError, setShareError] = useState('');
   const [lookupPreview, setLookupPreview] = useState(null);
   const [lookupBusy, setLookupBusy] = useState(false);
+  const [detailCriticalInput, setDetailCriticalInput] = useState('');
+  const [detailOptionalInput, setDetailOptionalInput] = useState('');
+  const [editingKey, setEditingKey] = useState(null);
+  const [editDraft, setEditDraft] = useState('');
 
   const itemChecksKey = useMemo(
     () =>
@@ -248,6 +295,22 @@ const ChecklistDetail = ({
     }, 400);
     return () => clearTimeout(t);
   }, [shareUsername, showShareModal]);
+
+  useEffect(() => {
+    setDetailCriticalInput('');
+    setDetailOptionalInput('');
+    setEditingKey(null);
+    setEditDraft('');
+  }, [scenario.id]);
+
+  useEffect(() => {
+    if (!allowManageItems) {
+      setEditingKey(null);
+      setEditDraft('');
+      setDetailCriticalInput('');
+      setDetailOptionalInput('');
+    }
+  }, [allowManageItems]);
 
   const finalItems = useMemo(() => ensureUniqueItemIds(scenario.items || []).items, [ensureUniqueItemIds, scenario.items]);
   const totalCount = finalItems.length;
@@ -308,6 +371,59 @@ const ChecklistDetail = ({
     updateScenario({ ...scenario, items: newItems });
     setAssigningItem(null);
   };
+
+  const addDetailItem = useCallback(
+    (text, critical) => {
+      if (!canManageListItems || isSaving) return;
+      const v = String(text || '').trim();
+      if (!v) return;
+      const newItem = {
+        id: `it_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+        text: v,
+        critical,
+        assignedTo: 'me',
+      };
+      updateScenario({ ...scenario, items: [...(scenario.items || []), newItem] });
+      if (critical) setDetailCriticalInput('');
+      else setDetailOptionalInput('');
+    },
+    [canManageListItems, isSaving, scenario, updateScenario],
+  );
+
+  const removeItem = useCallback(
+    (id) => {
+      if (!canManageListItems || isSaving) return;
+      setCheckedItems((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        delete next[String(id)];
+        return next;
+      });
+      updateScenario({
+        ...scenario,
+        items: (scenario.items || []).filter((it) => String(it.id) !== String(id)),
+      });
+    },
+    [canManageListItems, isSaving, scenario, updateScenario, setCheckedItems],
+  );
+
+  const cancelEdit = useCallback(() => {
+    setEditingKey(null);
+    setEditDraft('');
+  }, []);
+
+  const commitEdit = useCallback(() => {
+    if (!canManageListItems || isSaving || !editingKey) return;
+    const v = editDraft.trim();
+    if (!v) return;
+    updateScenario({
+      ...scenario,
+      items: (scenario.items || []).map((it) =>
+        String(it.id) === String(editingKey) ? { ...it, text: v } : it,
+      ),
+    });
+    cancelEdit();
+  }, [canManageListItems, isSaving, editingKey, editDraft, scenario, updateScenario, cancelEdit]);
 
   const Icon = IconMap[scenario.icon] || Briefcase;
   const cardTheme = scenario.theme || { bg: theme.primary, text: 'text-white' };
@@ -565,23 +681,79 @@ const ChecklistDetail = ({
               <AlertCircle size={13} className="shrink-0" /> {t?.('criticalLabel')}
             </h3>
             <div className={listShell}>
-              {criticalItems.map((item) => (
-                <CheckItem
-                  key={item.id}
-                  item={item}
-                  checked={!!checkedItems[item.id]}
-                  onToggle={() => toggleItem(item.id)}
-                  type="critical"
-                  friends={friends}
-                  collaborators={scenario.collaborators}
-                  onAssignClick={() => setAssigningItem(item)}
-                  theme={theme}
-                  meUser={me}
-                  t={t}
-                  canAssign={canAssign}
-                  readOnly={readOnly}
-                />
-              ))}
+              {criticalItems.map((item) =>
+                String(item.id) === editingKey && canManageListItems ? (
+                  <div
+                    key={item.id}
+                    className={`flex flex-wrap items-center gap-2 p-4 border-b last:border-b-0 ${
+                      theme.isDark ? 'bg-slate-900/40' : 'bg-[#FFFCF8]'
+                    }`}
+                  >
+                    <input
+                      type="text"
+                      className={`flex-1 min-w-[140px] rounded-xl border px-3 py-2.5 text-sm outline-none ${
+                        theme.isDark
+                          ? 'border-slate-600 bg-slate-900 text-slate-100'
+                          : 'border-[#EAEAEA] bg-white text-gray-800'
+                      }`}
+                      value={editDraft}
+                      onChange={(e) => setEditDraft(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && commitEdit()}
+                      disabled={isSaving}
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={commitEdit}
+                      disabled={isSaving || !editDraft.trim()}
+                      className={`shrink-0 px-3 py-2 rounded-xl text-xs font-bold ${
+                        editDraft.trim() && !isSaving
+                          ? `btn-primary-soft text-white ${theme.primary}`
+                          : theme.isDark
+                            ? 'bg-slate-800 text-slate-500'
+                            : 'bg-[#EAEAEA] text-[#C0C0C0]'
+                      }`}
+                    >
+                      {t?.('commonSave')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelEdit}
+                      disabled={isSaving}
+                      className={`shrink-0 px-3 py-2 rounded-xl text-xs font-bold ${
+                        theme.isDark ? 'bg-slate-800 text-slate-300' : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {t?.('commonCancel')}
+                    </button>
+                  </div>
+                ) : (
+                  <CheckItem
+                    key={item.id}
+                    item={item}
+                    checked={!!checkedItems[item.id]}
+                    onToggle={() => toggleItem(item.id)}
+                    type="critical"
+                    friends={friends}
+                    collaborators={scenario.collaborators}
+                    onAssignClick={() => setAssigningItem(item)}
+                    theme={theme}
+                    meUser={me}
+                    t={t}
+                    canAssign={canAssign}
+                    readOnly={readOnly}
+                    onEdit={
+                      canManageListItems
+                        ? () => {
+                            setEditingKey(String(item.id));
+                            setEditDraft(item.text || '');
+                          }
+                        : undefined
+                    }
+                    onDelete={canManageListItems ? () => removeItem(item.id) : undefined}
+                  />
+                ),
+              )}
             </div>
           </div>
         ) : null}
@@ -590,25 +762,178 @@ const ChecklistDetail = ({
           <div className={listShell}>
             {finalItems
               .filter((i) => !i.critical)
-              .map((item) => (
-                <CheckItem
-                  key={item.id}
-                  item={item}
-                  checked={!!checkedItems[item.id]}
-                  onToggle={() => toggleItem(item.id)}
-                  type="normal"
-                  friends={friends}
-                  collaborators={scenario.collaborators}
-                  onAssignClick={() => setAssigningItem(item)}
-                  theme={theme}
-                  meUser={me}
-                  t={t}
-                  canAssign={canAssign}
-                  readOnly={readOnly}
-                />
-              ))}
+              .map((item) =>
+                String(item.id) === editingKey && canManageListItems ? (
+                  <div
+                    key={item.id}
+                    className={`flex flex-wrap items-center gap-2 p-4 border-b last:border-b-0 ${
+                      theme.isDark ? 'bg-slate-900/30' : 'bg-white'
+                    }`}
+                  >
+                    <input
+                      type="text"
+                      className={`flex-1 min-w-[140px] rounded-xl border px-3 py-2.5 text-sm outline-none ${
+                        theme.isDark
+                          ? 'border-slate-600 bg-slate-900 text-slate-100'
+                          : 'border-[#EAEAEA] bg-white text-gray-800'
+                      }`}
+                      value={editDraft}
+                      onChange={(e) => setEditDraft(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && commitEdit()}
+                      disabled={isSaving}
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={commitEdit}
+                      disabled={isSaving || !editDraft.trim()}
+                      className={`shrink-0 px-3 py-2 rounded-xl text-xs font-bold ${
+                        editDraft.trim() && !isSaving
+                          ? `btn-primary-soft text-white ${theme.primary}`
+                          : theme.isDark
+                            ? 'bg-slate-800 text-slate-500'
+                            : 'bg-[#EAEAEA] text-[#C0C0C0]'
+                      }`}
+                    >
+                      {t?.('commonSave')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={cancelEdit}
+                      disabled={isSaving}
+                      className={`shrink-0 px-3 py-2 rounded-xl text-xs font-bold ${
+                        theme.isDark ? 'bg-slate-800 text-slate-300' : 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {t?.('commonCancel')}
+                    </button>
+                  </div>
+                ) : (
+                  <CheckItem
+                    key={item.id}
+                    item={item}
+                    checked={!!checkedItems[item.id]}
+                    onToggle={() => toggleItem(item.id)}
+                    type="normal"
+                    friends={friends}
+                    collaborators={scenario.collaborators}
+                    onAssignClick={() => setAssigningItem(item)}
+                    theme={theme}
+                    meUser={me}
+                    t={t}
+                    canAssign={canAssign}
+                    readOnly={readOnly}
+                    onEdit={
+                      canManageListItems
+                        ? () => {
+                            setEditingKey(String(item.id));
+                            setEditDraft(item.text || '');
+                          }
+                        : undefined
+                    }
+                    onDelete={canManageListItems ? () => removeItem(item.id) : undefined}
+                  />
+                ),
+              )}
           </div>
         </div>
+        {canManageListItems ? (
+          <div className="space-y-4">
+            <div>
+              <h3 className={`text-[11px] font-bold uppercase tracking-wider ml-1 ${theme.textSub}`}>
+                {t?.('tripChecklistLabel')}
+              </h3>
+              <p className={`text-xs ${theme.textSub} ml-1 mt-1`}>{t?.('detailManageListHint')}</p>
+            </div>
+            <div
+              className={`${theme.cardBg} rounded-2xl p-4 shadow-sm border ${
+                theme.isDark ? 'border-slate-700/60' : 'border-[#F3F3F3]'
+              } space-y-3`}
+            >
+              <div className="flex items-center justify-between">
+                <p className={`text-sm font-bold ${theme.textMain} flex items-center gap-1.5`}>
+                  <AlertCircle size={14} className={theme.isDark ? 'text-rose-300' : 'text-[#D98282]'} />
+                  {t?.('tripMustBring')}
+                </p>
+                <span className={`text-[11px] ${theme.textSub}`}>
+                  {t?.('tripItemsCount').replace('{count}', String(criticalItems.length))}
+                </span>
+              </div>
+              <div
+                className={`rounded-xl border px-2 py-1.5 flex items-center ${
+                  theme.isDark ? 'border-slate-600 bg-slate-900/60' : 'border-[#EAEAEA] bg-white'
+                }`}
+              >
+                <input
+                  type="text"
+                  placeholder={t?.('tripAddMustPlaceholder')}
+                  className={`flex-1 bg-transparent px-2 outline-none text-sm ${theme.textMain}`}
+                  value={detailCriticalInput}
+                  onChange={(e) => setDetailCriticalInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addDetailItem(detailCriticalInput, true)}
+                  disabled={isSaving}
+                />
+                <button
+                  type="button"
+                  onClick={() => addDetailItem(detailCriticalInput, true)}
+                  disabled={isSaving || !detailCriticalInput.trim()}
+                  className={`p-2 rounded-lg ${
+                    detailCriticalInput.trim() && !isSaving
+                      ? `btn-primary-soft ${theme.primary} text-white`
+                      : 'bg-[#F5F5F5] text-[#D1D1D1]'
+                  }`}
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+            </div>
+            <div
+              className={`${theme.cardBg} rounded-2xl p-4 shadow-sm border ${
+                theme.isDark ? 'border-slate-700/60' : 'border-[#F3F3F3]'
+              } space-y-3`}
+            >
+              <div className="flex items-center justify-between">
+                <p className={`text-sm font-bold ${theme.textMain} flex items-center gap-1.5`}>
+                  <Circle size={13} className={theme.isDark ? 'text-slate-300' : 'text-[#9A9A9A]'} />
+                  {t?.('tripOptional')}
+                </p>
+                <span className={`text-[11px] ${theme.textSub}`}>
+                  {t?.('tripItemsCount').replace(
+                    '{count}',
+                    String(finalItems.filter((i) => !i.critical).length),
+                  )}
+                </span>
+              </div>
+              <div
+                className={`rounded-xl border px-2 py-1.5 flex items-center ${
+                  theme.isDark ? 'border-slate-600 bg-slate-900/60' : 'border-[#EAEAEA] bg-white'
+                }`}
+              >
+                <input
+                  type="text"
+                  placeholder={t?.('tripAddOptionalPlaceholder')}
+                  className={`flex-1 bg-transparent px-2 outline-none text-sm ${theme.textMain}`}
+                  value={detailOptionalInput}
+                  onChange={(e) => setDetailOptionalInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addDetailItem(detailOptionalInput, false)}
+                  disabled={isSaving}
+                />
+                <button
+                  type="button"
+                  onClick={() => addDetailItem(detailOptionalInput, false)}
+                  disabled={isSaving || !detailOptionalInput.trim()}
+                  className={`p-2 rounded-lg ${
+                    detailOptionalInput.trim() && !isSaving
+                      ? `btn-primary-soft ${theme.primary} text-white`
+                      : 'bg-[#F5F5F5] text-[#D1D1D1]'
+                  }`}
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {!readOnly ? (

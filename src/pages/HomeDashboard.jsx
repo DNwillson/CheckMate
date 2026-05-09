@@ -135,7 +135,7 @@ const HomeDashboard = ({
     return fallback.length ? fallback.join(' · ') : t?.('weatherSummaryBasedOnForecast');
   }, [selectedTipDayWeather, t, tempUnit, weather]);
   const myTrips = useMemo(
-    () => scenarios.filter((s) => s.type === 'custom' && s.access !== 'shared' && !s.archived),
+    () => scenarios.filter((s) => s.type === 'custom' && !s.archived),
     [scenarios],
   );
   const weatherEligibleTrips = useMemo(() => {
@@ -151,7 +151,8 @@ const HomeDashboard = ({
         d.getDate() === target.getDate()
       );
     };
-    return myTrips.filter((s) => isSameLocalDate(s.trip_start_at));
+    // 仅查看的共享清单不能写入天气建议，与 App 内 handleAppendWeatherItems 一致
+    return myTrips.filter((s) => s.access !== 'shared' && isSameLocalDate(s.trip_start_at));
   }, [myTrips, tipTargetDate]);
   const weatherPackingItems = useMemo(() => {
     const out = [];

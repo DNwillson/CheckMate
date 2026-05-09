@@ -204,6 +204,31 @@ export default function App() {
     };
   }, [refreshData, loadWeather]);
 
+  /** 切回浏览器标签或窗口时同步好友、行程等（避免需手动整页刷新） */
+  const lastVisibilityRefreshRef = useRef(0);
+  useEffect(() => {
+    if (!currentUser) return undefined;
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastVisibilityRefreshRef.current < 4000) return;
+      lastVisibilityRefreshRef.current = now;
+      void refreshData();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [currentUser, refreshData]);
+
+  /** 在主界面停留时定期拉取数据，便于跨账号协作（如好友通过申请）尽快反映 */
+  useEffect(() => {
+    if (!currentUser || sessionRestoring) return undefined;
+    if (!['home', 'me', 'quick', 'calendar'].includes(currentView)) return undefined;
+    const id = setInterval(() => {
+      void refreshData();
+    }, 28000);
+    return () => clearInterval(id);
+  }, [currentUser, currentView, sessionRestoring, refreshData]);
+
   const handleAuth = useCallback(
     async ({ username, password, mode }) => {
       if (mode === 'register') {
@@ -238,10 +263,16 @@ export default function App() {
     [scenarios],
   );
 
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    setCurrentView(tab);
-  };
+  const handleTabChange = useCallback(
+    (tab) => {
+      setActiveTab(tab);
+      setCurrentView(tab);
+      if (tab === 'me' && currentUser) {
+        void refreshData();
+      }
+    },
+    [currentUser, refreshData],
+  );
 
   const handleLogout = useCallback(() => {
     api.logout();

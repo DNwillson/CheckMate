@@ -251,6 +251,15 @@ const MyProfileAndLibrary = ({
     }
   }, []);
 
+  /** 停在「好友」分段时轮询请求状态，避免对方已接受仍显示「等待中」直到手动刷新 */
+  useEffect(() => {
+    if (activeSegment !== 'friends') return undefined;
+    const id = setInterval(() => {
+      void reloadFriendRequests();
+    }, 14000);
+    return () => clearInterval(id);
+  }, [activeSegment, reloadFriendRequests]);
+
   const customScenarios = useMemo(
     () => scenarios.filter((s) => s.type === 'custom' && !s.archived),
     [scenarios],

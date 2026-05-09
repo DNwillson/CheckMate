@@ -3,11 +3,24 @@ import { Send, X, Bot } from 'lucide-react';
 import { api } from '../api';
 import AssistantFormattedMessage from '../components/AssistantFormattedMessage';
 
+/** Strip markdown noise so headings like **Trip note:** match reliably */
+function lineForHeading(raw) {
+  return String(raw || '')
+    .trim()
+    .replace(/\*\*/g, '')
+    .replace(/^\*+\s*/, '')
+    .replace(/\s*\*+$/, '')
+    .trim();
+}
+
 function extractPackingItems(text) {
   if (!text) return [];
   const lines = String(text).split('\n');
   const out = [];
   let section = null;
+  /** After Trip note / Tips / follow-up blocks, list bullets are guidance — not packing items */
+  let afterNonListBlock = false;
+
   const isCriticalHeading = (s) => {
     const l = s.toLowerCase();
     return (
@@ -25,52 +38,67 @@ function extractPackingItems(text) {
       l === 'normal' ||
       l === 'optional' ||
       l === 'recommended' ||
-      l === 'trip' ||
+      (l === 'trip' && !/^trip\s*note\b/i.test(s)) ||
       /推荐|建議|建议|可选|清单|行李|出发|出發/.test(s)
     );
   };
-  const isNonListHeading = (s) => {
-    const l = s.toLowerCase();
+  const isNonListHeading = (headingLine) => {
+    const l = headingLine.toLowerCase();
     return (
       l === 'tips' ||
+      l === 'tip' ||
+      /^tips\s*[:：]?\s*$/.test(l) ||
       l === 'follow-up' ||
       l === 'follow up' ||
-      l === 'trip note' ||
       l.startsWith('follow-up') ||
       l.startsWith('follow up') ||
-      /^trip note:/i.test(s) ||
-      /提示|补充|補充|追问|追問|后续|後續|后續/.test(s)
+      l === 'trip note' ||
+      /^trip\s*note\s*[:：]/i.test(headingLine) ||
+      /提示|补充|補充|追问|追問|后续|後續|后續/.test(headingLine)
     );
   };
+
   lines.forEach((line) => {
     const trimmed = line.trim();
     if (!trimmed) return;
-    const cleanHeading = trimmed.replace(/^\*+/, '').replace(/\*+$/, '').replace(/:+$/, '').trim();
+    const headingLine = lineForHeading(trimmed);
+    const cleanHeading = headingLine.replace(/:+$/, '').trim();
+
     if (isCriticalHeading(cleanHeading)) {
       section = 'critical';
+      afterNonListBlock = false;
       return;
     }
     if (isNormalHeading(cleanHeading)) {
       section = 'normal';
+      afterNonListBlock = false;
       return;
     }
-    if (isNonListHeading(trimmed) || isNonListHeading(cleanHeading)) {
+    if (isNonListHeading(headingLine) || isNonListHeading(cleanHeading)) {
       section = null;
+      afterNonListBlock = true;
       return;
     }
-    // If model outputs a custom heading like "Follow-up questions:" / "Next questions:",
-    // clear current section to avoid importing question bullets as packing items.
-    if (!/^[-•]\s+/.test(trimmed) && /[:：]$/.test(trimmed) && /question|问题|問題|follow/i.test(trimmed)) {
+    if (!/^[-•]\s+/.test(trimmed) && /[:：]$/.test(headingLine) && /question|问题|問題|follow/i.test(headingLine)) {
       section = null;
+      afterNonListBlock = true;
       return;
     }
     const bullet = trimmed.match(/^[-•]\s*(?:[-•]\s*)?(.+)/);
     if (!bullet) return;
+    if (afterNonListBlock) return;
+
     const candidate = bullet[1].trim();
-    // Safety net: never import obvious follow-up question bullets.
     if (/[?？]$/.test(candidate) || /^(which|what|when|how|any)\b/i.test(candidate)) return;
     if (/^(请问|是否|幾天|几天|什么时候|何時|哪天|哪個|哪个|是否有)/.test(candidate)) return;
-    // If provider returns bullets without strict section headings, treat as normal list by default.
+    // Instruction-style lines (common under Tips / Trip note)
+    if (
+      /^(say|try|avoid|use|keep|add|one short|for example|e\.g\.|例如|比如|建议|建議|請|请)\b/i.test(candidate)
+    ) {
+      return;
+    }
+    if (/random letters|emoji-only|symbol-only|does not look like a clear trip/i.test(candidate)) return;
+
     if (!section) section = 'normal';
     const itemText = bullet[1].trim().replace(/^[-•]\s*/, '');
     if (!itemText) return;

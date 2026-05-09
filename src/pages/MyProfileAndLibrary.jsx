@@ -251,14 +251,26 @@ const MyProfileAndLibrary = ({
     }
   }, []);
 
-  /** 停在「好友」分段时轮询请求状态，避免对方已接受仍显示「等待中」直到手动刷新 */
+  /** 父级 refreshData 更新好友列表后，立刻同步入站/出站请求（发送方在对方同意后出站应清空） */
+  const friendsSyncKey = useMemo(
+    () =>
+      `${(friends || []).length}:${(friends || [])
+        .map((f) => `${f.id}:${f.linked_user_id ?? ''}:${f.name ?? ''}`)
+        .sort()
+        .join('|')}`,
+    [friends],
+  );
   useEffect(() => {
-    if (activeSegment !== 'friends') return undefined;
+    void reloadFriendRequests();
+  }, [friendsSyncKey, reloadFriendRequests]);
+
+  /** 在「我的」任意子标签下轮询请求；仅好友页轮询时，发送方停在「行程」等子标签会一直看到过期的「等待中」 */
+  useEffect(() => {
     const id = setInterval(() => {
       void reloadFriendRequests();
-    }, 14000);
+    }, 10000);
     return () => clearInterval(id);
-  }, [activeSegment, reloadFriendRequests]);
+  }, [reloadFriendRequests]);
 
   const customScenarios = useMemo(
     () => scenarios.filter((s) => s.type === 'custom' && !s.archived),

@@ -422,6 +422,10 @@ export default function App() {
       const normalize = (v) => String(v || '').trim().toLowerCase().replace(/\s+/g, ' ');
       const exists = new Set((target.items || []).map((it) => normalize(it?.text)));
       const nextItems = ensureUniqueItemIds(target.items || []);
+      const defaultAssignee =
+        target.access === 'shared_edit' && currentUser?.db_id != null
+          ? `u${currentUser.db_id}`
+          : 'me';
       incoming.forEach((it) => {
         const text = String(it?.text || '').trim();
         if (!text) return;
@@ -432,14 +436,14 @@ export default function App() {
           id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
           text,
           critical: !!it?.critical,
-          assignedTo: 'me',
+          assignedTo: defaultAssignee,
         });
       });
 
       await api.updateScenario(scenarioId, { items: nextItems });
       await refreshData();
     },
-    [refreshData, scenarios],
+    [currentUser?.db_id, refreshData, scenarios],
   );
 
   const handleAppendWeatherItems = useCallback(
@@ -464,6 +468,10 @@ export default function App() {
       const normalize = (v) => String(v || '').trim().toLowerCase().replace(/\s+/g, ' ');
       const exists = new Set((target.items || []).map((it) => normalize(it?.text)));
       const nextItems = ensureUniqueItemIds(target.items || []);
+      const defaultAssignee =
+        target.access === 'shared_edit' && currentUser?.db_id != null
+          ? `u${currentUser.db_id}`
+          : 'me';
       incoming.forEach((it) => {
         const text = String(it?.text || '').trim();
         if (!text) return;
@@ -474,14 +482,14 @@ export default function App() {
           id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
           text,
           critical: !!it?.critical,
-          assignedTo: 'me',
+          assignedTo: defaultAssignee,
         });
       });
 
       await api.updateScenario(scenarioId, { items: nextItems });
       await refreshData();
     },
-    [refreshData, scenarios],
+    [currentUser?.db_id, refreshData, scenarios],
   );
 
   const handleOpenTripsFromAssistant = useCallback(() => {

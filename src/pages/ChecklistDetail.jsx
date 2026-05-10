@@ -19,6 +19,22 @@ import {
 import { CURRENT_USER, IconMap } from '../constants/data';
 import { api } from '../api';
 
+function normalizeAssigneeKey(raw) {
+  if (raw == null) return 'me';
+  const s = String(raw).trim();
+  return s === '' ? 'me' : s;
+}
+
+function findFriendByAssigneeId(friends, assigneeId) {
+  if (!assigneeId || assigneeId === 'me' || !friends?.length) return null;
+  const aid = String(assigneeId);
+  return (
+    friends.find((f) => f.id === aid) ||
+    friends.find((f) => f.linked_user_id != null && `u${f.linked_user_id}` === aid) ||
+    null
+  );
+}
+
 const AssigneeBtn = ({ user, active, onClick, theme }) => (
   <button
     type="button"
@@ -48,6 +64,8 @@ const CheckItem = ({
   meUser,
   /** 在共享清单上，数据里 assignedTo "me" 表示清单所有者，而非当前登录用户 */
   listOwnerDisplay,
+  /** 清单所有者的 users.id；仅共享行程有值 */
+  scenarioOwnerUserId = null,
   t,
   canAssign,
   readOnly,
@@ -56,12 +74,37 @@ const CheckItem = ({
 }) => {
   const isCritical = type === 'critical';
   const hasCollaborators = collaborators && collaborators.length > 0;
-  const ownerSlot = listOwnerDisplay || meUser;
-  let assigneeAvatar = ownerSlot.avatar;
-  let assigneeName = ownerSlot.name || t?.('navMe');
+  const aid = normalizeAssigneeKey(item.assignedTo);
+  const ownerUid = scenarioOwnerUserId ?? null;
+  const listOwner = listOwnerDisplay;
 
-  if (item.assignedTo && item.assignedTo !== 'me') {
-    const friend = friends?.find((f) => f.id === item.assignedTo);
+  let assigneeAvatar;
+  let assigneeName;
+  if (!listOwner) {
+    if (aid === 'me') {
+      assigneeAvatar = meUser.avatar;
+      assigneeName = meUser.name || t?.('navMe');
+    } else if (meUser.db_id != null && aid === `u${meUser.db_id}`) {
+      assigneeAvatar = meUser.avatar;
+      assigneeName = meUser.name || t?.('navMe');
+    } else {
+      const friend = findFriendByAssigneeId(friends, aid);
+      if (friend) {
+        assigneeAvatar = friend.avatar;
+        assigneeName = friend.name;
+      } else {
+        assigneeAvatar = meUser.avatar;
+        assigneeName = meUser.name || t?.('navMe');
+      }
+    }
+  } else if (aid === 'me' || (ownerUid != null && aid === `u${ownerUid}`)) {
+    assigneeAvatar = listOwner.avatar;
+    assigneeName = listOwner.name;
+  } else if (meUser.db_id != null && aid === `u${meUser.db_id}`) {
+    assigneeAvatar = meUser.avatar;
+    assigneeName = meUser.name || t?.('navMe');
+  } else {
+    const friend = findFriendByAssigneeId(friends, aid);
     if (friend) {
       assigneeAvatar = friend.avatar;
       assigneeName = friend.name;
@@ -392,11 +435,13 @@ const ChecklistDetail = ({
       if (!canManageListItems || isSaving) return;
       const v = String(text || '').trim();
       if (!v) return;
+      const defaultAssignee =
+        scenario.access === 'shared_edit' && me?.db_id != null ? `u${me.db_id}` : 'me';
       const newItem = {
         id: `it_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
         text: v,
         critical,
-        assignedTo: 'me',
+        assignedTo: defaultAssignee,
       };
       updateScenario({ ...scenario, items: [...(scenario.items || []), newItem] });
       if (critical) setDetailCriticalInput('');
@@ -755,6 +800,7 @@ const ChecklistDetail = ({
                     theme={theme}
                     meUser={me}
                     listOwnerDisplay={listOwnerDisplay}
+                    scenarioOwnerUserId={scenario.owner_user_id}
                     t={t}
                     canAssign={canAssign}
                     readOnly={readOnly}
@@ -837,6 +883,7 @@ const ChecklistDetail = ({
                     theme={theme}
                     meUser={me}
                     listOwnerDisplay={listOwnerDisplay}
+                    scenarioOwnerUserId={scenario.owner_user_id}
                     t={t}
                     canAssign={canAssign}
                     readOnly={readOnly}

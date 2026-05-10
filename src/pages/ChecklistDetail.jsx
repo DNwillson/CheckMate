@@ -299,32 +299,29 @@ const ChecklistDetail = ({
   const [editingKey, setEditingKey] = useState(null);
   const [editDraft, setEditDraft] = useState('');
 
-  const itemChecksKey = useMemo(
-    () =>
-      (scenario.items || [])
-        .map((i) => `${i.id}:${i.checked ? 1 : 0}`)
-        .join('|'),
-    [scenario.items],
-  );
+  /** 仅随「物品 id 集合」变，避免每次勾选都触发去重 effect */
+  const scenarioItemIdsKey = (scenario.items || [])
+    .map((i) => String(i?.id ?? ''))
+    .join('\u001f');
 
   useEffect(() => {
     const normalized = ensureUniqueItemIds(scenario.items || []);
     if (normalized.changed) {
       void updateScenario({ ...scenario, items: normalized.items });
     }
-  }, [ensureUniqueItemIds, scenario, updateScenario]);
+    // scenarioItemIdsKey 在仅改 checked 时不变；不依赖整个 scenario 以免每次保存都跑
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ensureUniqueItemIds, scenario.id, scenario.owner_user_id, scenarioItemIdsKey, updateScenario]);
 
-  useEffect(
-    () => {
-      const next = {};
-      (scenario.items || []).forEach((it) => {
-        if (it && it.id != null && it.checked) next[it.id] = true;
-      });
-      setCheckedItems(next);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- itemChecksKey encodes items[].checked
-    [scenario.id, itemChecksKey, setCheckedItems],
-  );
+  /** 只在切换行程时从 scenario.items 同步勾选；API 不持久化 checked，勿在每次保存后覆盖本地勾选 */
+  const checksHydrateKey = `${scenario.id}\u0000${scenario.owner_user_id ?? ''}`;
+  useEffect(() => {
+    const next = {};
+    (scenario.items || []).forEach((it) => {
+      if (it && it.id != null && it.checked) next[it.id] = true;
+    });
+    setCheckedItems(next);
+  }, [checksHydrateKey, setCheckedItems]);
 
   useEffect(() => {
     if (!showShareModal) {

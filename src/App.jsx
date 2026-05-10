@@ -42,6 +42,20 @@ const ensureUniqueItemIds = (items) => {
   });
 };
 
+/** 接口返回的 items 不含 checked；合并时保留当前列表里已勾选状态，避免反复丢状态 */
+const mergeItemsPreserveCheckedFromLocal = (localItems, serverItems) => {
+  const checkedById = new Map();
+  (localItems || []).forEach((it) => {
+    if (it && it.id != null && it.checked) checkedById.set(String(it.id), true);
+  });
+  return (serverItems || []).map((it) => {
+    if (!it || it.id == null) return it;
+    const id = String(it.id);
+    if (checkedById.get(id)) return { ...it, checked: true };
+    return it;
+  });
+};
+
 export default function App() {
   const [currentView, setCurrentView] = useState('login');
   const [scenarios, setScenarios] = useState([]);
@@ -533,8 +547,10 @@ export default function App() {
           prev.map((s) => {
             if (s.id !== id) return s;
             if ((s.owner_user_id ?? null) !== (activeScenarioOwnerId ?? null)) return s;
+            const mergedItems = mergeItemsPreserveCheckedFromLocal(s.items, saved.items);
             return {
               ...saved,
+              items: mergedItems,
               owner_user_id: s.owner_user_id,
               access: s.access,
               owner_username: s.owner_username,

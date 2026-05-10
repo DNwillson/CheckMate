@@ -2406,19 +2406,30 @@ def _cleanup_friend_from_scenarios(user_id: int, friend_id: str) -> None:
             sc.items = new_items
 
 
-def _sync_edit_shares_for_collaborators(owner_user_id: int, scenario_id: str, collaborators: list[Any]) -> None:
-    """Ensure edit shares exist for collaborators, and remove stale ones.
-
-    collaborators: scenario.collaborators list (ids like 'u{user_id}').
-    """
-    want_ids: set[int] = set()
+def _collaborator_user_ids(collaborators: list[Any]) -> set[int]:
+    """Parse scenario.collaborators entries like 'u12' into user ids."""
+    out: set[int] = set()
     for fid in collaborators or []:
         if isinstance(fid, str) and fid.startswith("u"):
             try:
-                want_ids.add(int(fid[1:]))
+                out.add(int(fid[1:]))
             except ValueError:
                 continue
+    return out
 
+
+def _sync_edit_shares_for_collaborators(
+    owner_user_id: int,
+    scenario_id: str,
+    collaborators: list[Any],
+    revoke_edit_user_ids: set[int] | None = None,
+) -> None:
+    """Grant can_edit shares for trip collaborators; downgrade edit for removed collaborators only.
+
+    Must NOT treat an empty collaborators list as 'remove everyone': explicit shares
+    from POST /share (with or without edit) are separate from collaborators.
+    """
+    want_ids = _collaborator_user_ids(collaborators)
     existing = ScenarioShare.query.filter_by(owner_user_id=owner_user_id, scenario_id=scenario_id).all()
     existing_by_uid = {r.shared_with_user_id: r for r in existing}
 
@@ -2427,18 +2438,19 @@ def _sync_edit_shares_for_collaborators(owner_user_id: int, scenario_id: str, co
         if r:
             r.can_edit = True
         else:
-            db.session.add(
-                ScenarioShare(
-                    owner_user_id=owner_user_id,
-                    scenario_id=scenario_id,
-                    shared_with_user_id=uid,
-                    can_edit=True,
-                )
+            n = ScenarioShare(
+                owner_user_id=owner_user_id,
+                scenario_id=scenario_id,
+                shared_with_user_id=uid,
+                can_edit=True,
             )
+            db.session.add(n)
+            existing_by_uid[uid] = n
 
-    for r in existing:
-        if r.can_edit and r.shared_with_user_id not in want_ids:
-            db.session.delete(r)
+    for uid in set(revoke_edit_user_ids or set()):
+        r = existing_by_uid.get(uid)
+        if r and r.can_edit:
+            r.can_edit = False
 
 
 def _validate_items_assignees(items: Any, allowed_friend_ids: set[str]) -> str | None:
@@ -3218,13 +3230,18 @@ def create_app() -> Flask:
         if not is_owner and any(k in payload for k in ("name", "icon", "theme", "collaborators", "type", "trip_start_at", "trip_end_at")):
             return jsonify({"error": "Only the owner can edit list settings."}), 403
 
-        # Validate assignees based on collaborators on the owner's list.
+        # Validate assignees: collaborators, list owner, and anyone this scenario is shared with.
         collab = list(row.collaborators or [])
         allowed_friend_ids = set(["me", *[c for c in collab if isinstance(c, str)]])
+        allowed_friend_ids.add(f"u{row.user_id}")
+        for shr in ScenarioShare.query.filter_by(owner_user_id=row.user_id, scenario_id=scenario_id).all():
+            allowed_friend_ids.add(f"u{shr.shared_with_user_id}")
         if "items" in payload:
             msg = _validate_items_assignees(payload.get("items"), allowed_friend_ids)
             if msg:
                 return jsonify({"error": msg}), 400
+
+        prev_collab_uids = _collaborator_user_ids(row.collaborators)
 
         if is_owner and ("trip_start_at" in payload or "trip_end_at" in payload):
             try:
@@ -3248,7 +3265,11 @@ def create_app() -> Flask:
             row.type = payload["type"]
 
         if is_owner and "collaborators" in payload:
-            _sync_edit_shares_for_collaborators(uid, scenario_id, list(row.collaborators or []))
+            next_collab_uids = _collaborator_user_ids(row.collaborators)
+            removed_collab_uids = prev_collab_uids - next_collab_uids
+            _sync_edit_shares_for_collaborators(
+                uid, scenario_id, list(row.collaborators or []), removed_collab_uids
+            )
 
         db.session.commit()
         if is_owner:

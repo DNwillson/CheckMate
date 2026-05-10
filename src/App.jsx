@@ -530,6 +530,7 @@ export default function App() {
               owner_user_id: s.owner_user_id,
               access: s.access,
               owner_username: s.owner_username,
+              owner_avatar: s.owner_avatar,
               share_recipients: s.share_recipients,
             };
           }),

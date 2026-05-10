@@ -3251,7 +3251,21 @@ def create_app() -> Flask:
             _sync_edit_shares_for_collaborators(uid, scenario_id, list(row.collaborators or []))
 
         db.session.commit()
-        return jsonify(row.to_dict())
+        if is_owner:
+            return jsonify(row.to_dict())
+        sh_out = ScenarioShare.query.filter_by(
+            shared_with_user_id=uid, scenario_id=scenario_id
+        ).first()
+        owner_u = User.query.get(row.user_id)
+        d_out = dict(row.to_dict())
+        d_out["access"] = "shared_edit" if (sh_out and sh_out.can_edit) else "shared"
+        d_out["owner_user_id"] = row.user_id
+        d_out["owner_username"] = owner_u.username if owner_u else "?"
+        d_out["owner_avatar"] = (
+            _dicebear_avatar(owner_u.username, owner_u.avatar_style) if owner_u else None
+        )
+        d_out["share_recipients"] = []
+        return jsonify(d_out)
 
     @app.delete("/api/scenarios/<scenario_id>")
     @require_auth

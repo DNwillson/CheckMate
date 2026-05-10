@@ -46,6 +46,8 @@ const CheckItem = ({
   onAssignClick,
   theme,
   meUser,
+  /** 在共享清单上，数据里 assignedTo "me" 表示清单所有者，而非当前登录用户 */
+  listOwnerDisplay,
   t,
   canAssign,
   readOnly,
@@ -54,14 +56,18 @@ const CheckItem = ({
 }) => {
   const isCritical = type === 'critical';
   const hasCollaborators = collaborators && collaborators.length > 0;
-  let assigneeAvatar = meUser.avatar;
-  let assigneeName = meUser.name || t?.('navMe');
+  const ownerSlot = listOwnerDisplay || meUser;
+  let assigneeAvatar = ownerSlot.avatar;
+  let assigneeName = ownerSlot.name || t?.('navMe');
 
   if (item.assignedTo && item.assignedTo !== 'me') {
     const friend = friends?.find((f) => f.id === item.assignedTo);
     if (friend) {
       assigneeAvatar = friend.avatar;
       assigneeName = friend.name;
+    } else {
+      assigneeAvatar = meUser.avatar;
+      assigneeName = meUser.name || t?.('navMe');
     }
   }
 
@@ -225,6 +231,15 @@ const ChecklistDetail = ({
   const me = meUser || CURRENT_USER;
   const readOnly = scenario.access === 'shared';
   const isOwner = scenario.access === 'owner';
+  /** 共享清单里 JSON 的 assignedTo「me」指行程所有者，UI 上应用其头像与用户名 */
+  const listOwnerDisplay = useMemo(() => {
+    if (scenario.access === 'owner') return null;
+    const un = scenario.owner_username;
+    return {
+      name: un ? `@${un}` : me.name,
+      avatar: scenario.owner_avatar || me.avatar,
+    };
+  }, [scenario.access, scenario.owner_username, scenario.owner_avatar, me.name, me.avatar]);
   const canManageListItems = !!allowManageItems && !readOnly;
   const [isClosing, setIsClosing] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -739,6 +754,7 @@ const ChecklistDetail = ({
                     onAssignClick={() => setAssigningItem(item)}
                     theme={theme}
                     meUser={me}
+                    listOwnerDisplay={listOwnerDisplay}
                     t={t}
                     canAssign={canAssign}
                     readOnly={readOnly}
@@ -820,6 +836,7 @@ const ChecklistDetail = ({
                     onAssignClick={() => setAssigningItem(item)}
                     theme={theme}
                     meUser={me}
+                    listOwnerDisplay={listOwnerDisplay}
                     t={t}
                     canAssign={canAssign}
                     readOnly={readOnly}
@@ -1195,7 +1212,7 @@ const ChecklistDetail = ({
             ) : null}
             <div className="grid grid-cols-4 sm:grid-cols-5 gap-3">
               <AssigneeBtn
-                user={me}
+                user={listOwnerDisplay || me}
                 active={assigningItem.assignedTo === 'me' || !assigningItem.assignedTo}
                 onClick={() => handleAssignItem('me')}
                 theme={theme}
